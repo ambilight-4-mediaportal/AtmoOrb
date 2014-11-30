@@ -10460,7 +10460,7 @@ W = angled&lt;p&gt;
 <instance part="P+1" gate="1" x="40.64" y="71.12"/>
 <instance part="GND2" gate="1" x="58.42" y="45.72"/>
 <instance part="GND3" gate="1" x="73.66" y="48.26"/>
-<instance part="P+2" gate="1" x="157.48" y="71.12"/>
+<instance part="P+2" gate="1" x="160.02" y="71.12"/>
 <instance part="GND4" gate="1" x="157.48" y="25.4"/>
 <instance part="GND5" gate="1" x="40.64" y="48.26"/>
 <instance part="GND6" gate="1" x="86.36" y="55.88"/>
@@ -10536,15 +10536,15 @@ W = angled&lt;p&gt;
 <junction x="40.64" y="58.42"/>
 </segment>
 <segment>
-<pinref part="ARDUINO-MICRO-PRO" gate="G$1" pin="RAW"/>
-<wire x1="149.86" y1="60.96" x2="157.48" y2="60.96" width="0.1524" layer="91"/>
-<wire x1="157.48" y1="60.96" x2="157.48" y2="68.58" width="0.1524" layer="91"/>
-<pinref part="P+2" gate="1" pin="+5V"/>
-</segment>
-<segment>
 <pinref part="SV1" gate="G$1" pin="3"/>
 <pinref part="P+3" gate="1" pin="+5V"/>
 <wire x1="101.6" y1="40.64" x2="101.6" y2="43.18" width="0.1524" layer="91"/>
+</segment>
+<segment>
+<pinref part="ARDUINO-MICRO-PRO" gate="G$1" pin="VCC"/>
+<pinref part="P+2" gate="1" pin="+5V"/>
+<wire x1="149.86" y1="53.34" x2="160.02" y2="53.34" width="0.1524" layer="91"/>
+<wire x1="160.02" y1="53.34" x2="160.02" y2="68.58" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="+3V3" class="0">
