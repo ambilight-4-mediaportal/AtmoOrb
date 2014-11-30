@@ -28,7 +28,7 @@
 
 
 #define wifiSSID "Your SSID"
-#define wifiPassword "Your WiFi password"
+#define wifiPassword "Your WiFi Password"
 #define disableDHCP 1
 #define staticIP "192.168.1.42"
 #define serverPort 30003
@@ -39,8 +39,9 @@
 char serialBuffer[1000];
 String ip;
 boolean setupDone = false;
+long previousCheckIPMillis = 0; 
+long checkIPInterval = 5000;
 
-int test = 0;
 
 void setup()
 {
@@ -97,11 +98,25 @@ void loop()
     int len = Serial1.readBytesUntil('<\n>', serialBuffer, sizeof(serialBuffer));
     String message = String(serialBuffer).substring(0,len-1);
     int x = 0;
-    if (message.indexOf("+CIFSR:STAIP") > -1)
+    // AT 0.20 ip syntax
+    if (message.indexOf("+CIFSR:") > -1)
     {
-      int start = message.indexOf("+CIFSR:STAIP");
-      start = message.indexOf("\"", start) + 1; 
-      ip = message.substring(start, message.indexOf("\"", start));
+      if (message.indexOf("+CIFSR:STAIP") > -1)
+      {
+        int start = message.indexOf("+CIFSR:STAIP");
+        start = message.indexOf("\"", start) + 1; 
+        ip = message.substring(start, message.indexOf("\"", start));
+        Serial.println("IP: " + ip);
+        broadcast();
+      }
+    }
+    // AT pre 0.20 ip syntax
+    else if (message.indexOf("AT+CIFSR") > -1)
+    {
+      int start = message.indexOf("AT+CIFSR");
+      start = message.indexOf("\n", start) + 1;
+      start = message.indexOf("\n", start) + 1;
+      ip = message.substring(start, message.indexOf("\n", start) - 1);
       Serial.println("IP: " + ip);
       broadcast();
     }
@@ -109,10 +124,13 @@ void loop()
     // Not sure why. But static IP is supported.
     else if (message.indexOf("M-SEARCH") > -1)
     {
-      broadcast();
+      Serial1.println("AT+CIFSR");
     }
     else if (message.indexOf("setcolor:") > -1)
     {
+      int red = -1;
+      int green = -1;
+      int blue = -1;
       while (x < message.length())
       {
         int start = message.indexOf("setcolor:", x);
@@ -127,25 +145,27 @@ void loop()
         
         x = endValue3;
         
-        if (test == 0)
-        {
-          digitalWrite(9, HIGH);
-          test = 1;
-        }
-        else if (test == 1)
-        {
-          digitalWrite(9, LOW);
-          test = 0;
-        }  
-        Serial.println("Red:" + message.substring(start + 9, endValue1) + " Green:" + message.substring(endValue1 + 1, endValue2) + " Blue:" + message.substring(endValue2 + 1, endValue3));
+        red = message.substring(start + 9, endValue1).toInt();
+        green = message.substring(endValue1 + 1, endValue2).toInt();
+        blue = message.substring(endValue2 + 1, endValue3).toInt();
+      }
+      if (red != -1 && green != -1 && blue != -1)
+      {
+        // Change LED color
+        Serial.print("Red:");
+        Serial.print(red);
+        Serial.print(" Green:");
+        Serial.print(green);
+        Serial.print(" Blue:");
+        Serial.println(blue);
       }
     }
     Serial.println(message);
   }
-  if ((ip == "" || ip == "0.0.0.0") && setupDone)
+  if ((ip == "" || ip == "0.0.0.0") && setupDone && (millis() - previousCheckIPMillis > checkIPInterval))
   {
-    delay(1000);
     Serial1.println("AT+CIFSR");
+    previousCheckIPMillis = millis();
   }
 }
 
