@@ -26,6 +26,10 @@
 // You can either change the ESP8266 baudrate with "AT+CIOBAUD=..."
 // or change the program to use another one by editing "Serial1.begin(115200);"
 
+#include "FastLED.h"
+
+#define NUM_LEDS 24
+#define DATA_PIN 15
 
 #define wifiSSID "Your SSID"
 #define wifiPassword "Your WiFi Password"
@@ -34,7 +38,8 @@
 #define serverPort 30003
 #define broadcastIP "192.168.1.255"
 #define broadcastPort 30003
-#define ledPin 15
+
+CRGB leds[NUM_LEDS];
 
 char serialBuffer[1000];
 String ip;
@@ -45,8 +50,14 @@ long checkIPInterval = 5000;
 
 void setup()
 {
+  FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
+  for (int i = 0; i < NUM_LEDS; i++)
+  {
+    leds[i] = CRGB(255,255,255);
+  }
+  FastLED.show();
+  
   String setupMessage = "";
-  pinMode(9, OUTPUT);
   
   Serial.begin(115200);
   Serial.setTimeout(5);
