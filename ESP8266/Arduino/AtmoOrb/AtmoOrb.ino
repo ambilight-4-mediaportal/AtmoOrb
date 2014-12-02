@@ -29,7 +29,7 @@
 
 #define wifiSSID "Your SSID"
 #define wifiPassword "Your WiFi Password"
-#define disableDHCP 1
+#define disableDHCP 0
 #define staticIP "192.168.1.42"
 #define serverPort 30003
 #define broadcastIP "192.168.1.255"
@@ -55,13 +55,16 @@ void setup()
   
   delay(1000);
   Serial1.println("AT+RST");
-  Serial1.println("AT+CWMODE=3");
-  delay(100);
+  delay(10);
+  Serial1.println("AT+CWMODE=1");
+  delay(10);
+  Serial1.println("AT+RST");
+  delay(10);
   if (disableDHCP == 1)
   {
     Serial1.println("AT+CWDHCP=2,1");
+    delay(10);
   }
-  delay(100);
   setupMessage = "AT+CWJAP=\"";
   setupMessage += wifiSSID;
   setupMessage += "\",\"";
@@ -75,13 +78,14 @@ void setup()
     setupMessage += staticIP;
     setupMessage += "\"";
     Serial1.println(setupMessage);
+    delay(10);
   }
-  delay(100);
   Serial1.println("AT+CIPMUX=1");
-  delay(100);
+  delay(10);
   setupMessage = "AT+CIPSERVER=1,";
   setupMessage += serverPort;
   Serial1.println(setupMessage);
+  delay(10);
   setupDone = true;
 }
 
@@ -97,7 +101,7 @@ void loop()
   {
     int len = Serial1.readBytesUntil('<\n>', serialBuffer, sizeof(serialBuffer));
     String message = String(serialBuffer).substring(0,len-1);
-    int x = 0;
+
     // AT 0.20 ip syntax
     if (message.indexOf("+CIFSR:") > -1)
     {
@@ -115,7 +119,6 @@ void loop()
     {
       int start = message.indexOf("AT+CIFSR");
       start = message.indexOf("\n", start) + 1;
-      start = message.indexOf("\n", start) + 1;
       ip = message.substring(start, message.indexOf("\n", start) - 1);
       Serial.println("IP: " + ip);
       broadcast();
@@ -131,24 +134,18 @@ void loop()
       int red = -1;
       int green = -1;
       int blue = -1;
-      while (x < message.length())
+      int start = message.lastIndexOf("setcolor:") + 9;
+      int endValue = message.indexOf(';', start);
+
+      if (start == 8 || endValue == -1 || (endValue - start) != 6)
       {
-        int start = message.indexOf("setcolor:", x);
-        int endValue1 = message.indexOf(',', start + 9);
-        int endValue2 = message.indexOf(',', endValue1 + 1);
-        int endValue3 = message.indexOf(';', endValue2 + 1);
-        
-        if (start == -1 || endValue1 == -1 || endValue2 == -1 || endValue3 == -1)
-        {
-          break;
-        }
-        
-        x = endValue3;
-        
-        red = message.substring(start + 9, endValue1).toInt();
-        green = message.substring(endValue1 + 1, endValue2).toInt();
-        blue = message.substring(endValue2 + 1, endValue3).toInt();
+        return;
       }
+           
+      red = hexToDec(message.substring(start, start + 2));
+      green = hexToDec(message.substring(start + 2, start + 4));
+      blue = hexToDec(message.substring(start + 4, start + 6));
+
       if (red != -1 && green != -1 && blue != -1)
       {
         // Change LED color
@@ -192,3 +189,10 @@ void broadcast()
   Serial1.println(broadcastReply);
 }
 
+int hexToDec(String hex)
+{
+  char hexChar[hex.length()];
+  hex.toCharArray(hexChar, hex.length() + 1);
+  char* hexPos = hexChar;
+  return strtol(hexPos, &hexPos, 16);
+}
