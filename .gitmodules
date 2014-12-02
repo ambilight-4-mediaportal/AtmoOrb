@@ -1,3 +1,11 @@
 [submodule "Libraries/FastLED"]
 	path = Libraries/FastLED
 	url = https://github.com/FastLED/FastLED.git
+
+[submodule "Libraries/Adafruit_NeoPixel"]
+	path = Libraries/Adafruit_NeoPixel
+	url = https://github.com/adafruit/Adafruit_NeoPixel.git
+
+[submodule "Libraries/Adafruit_CC3000_Library"]
+	path = Libraries/Adafruit_CC3000_Library
+	url = https://github.com/adafruit/Adafruit_CC3000_Library.git
