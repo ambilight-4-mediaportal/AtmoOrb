@@ -122,7 +122,12 @@ void loop()
         start = message.indexOf("\"", start) + 1; 
         ip = message.substring(start, message.indexOf("\"", start));
         Serial.println("IP: " + ip);
-        broadcast();
+        String broadcastMessage = "AtmoOrbAddress:";
+        broadcastMessage += ip;
+        broadcastMessage += ",";
+        broadcastMessage += serverPort;
+        broadcastMessage += ";";
+        broadcast(broadcastMessage);
       }
     }
     // AT pre 0.20 ip syntax
@@ -132,7 +137,12 @@ void loop()
       start = message.indexOf("\n", start) + 1;
       ip = message.substring(start, message.indexOf("\n", start) - 1);
       Serial.println("IP: " + ip);
-      broadcast();
+      String broadcastMessage = "AtmoOrbAddress:";
+      broadcastMessage += ip;
+      broadcastMessage += ",";
+      broadcastMessage += serverPort;
+      broadcastMessage += ";";
+      broadcast(broadcastMessage);
     }
     // Receiving boradcast messages not working with 0020000903, but with 0018000902-AI03
     // Not sure why. But static IP is supported.
@@ -148,7 +158,7 @@ void loop()
       int start = message.lastIndexOf("setcolor:") + 9;
       int endValue = message.indexOf(';', start);
 
-      if (start == 8 || endValue == -1 || (endValue - start) != 6)
+      if (endValue == -1 || (endValue - start) != 6)
       {
         return;
       }
@@ -159,14 +169,48 @@ void loop()
 
       if (red != -1 && green != -1 && blue != -1)
       {
-        // Change LED color
-        Serial.print("Red:");
-        Serial.print(red);
-        Serial.print(" Green:");
-        Serial.print(green);
-        Serial.print(" Blue:");
-        Serial.println(blue);
+        for (int i = 0; i < NUM_LEDS; i++)
+        {
+          leds[i] = CRGB(red, green, blue);
+        }
+        FastLED.show();
       }
+    }
+    else if (message.indexOf("setcolors:") > -1)
+    {
+      int startPos = message.lastIndexOf("setcolors:") + 10;
+      boolean success = false;
+      int i = 0;
+      while (startPos < message.length())
+      {
+        int endPos = message.indexOf(",", startPos);
+        if (endPos == -1 && message.indexOf(";", startPos))
+        {
+          endPos = message.indexOf(";", startPos);
+        }
+        if (endPos == -1)
+        {
+          break;
+        }
+        if ((endPos - startPos) == 6 && i < NUM_LEDS)
+        {
+          success = true;
+          leds[i] = CRGB(hexToDec(message.substring(startPos, startPos + 2)), hexToDec(message.substring(startPos + 2, startPos + 4)), hexToDec(message.substring(startPos + 4, startPos + 6)));
+          i++;
+        }
+        startPos = endPos + 1;
+      }
+      if (success)
+      {
+        FastLED.show();
+      }
+    }
+    else if (message.indexOf("getledcount;") > -1)
+    {
+      String broadcastMessage = "AtmoOrbLEDCount:";
+      broadcastMessage += NUM_LEDS;
+      broadcastMessage += ";";
+      broadcast(broadcastMessage);
     }
     Serial.println(message);
   }
@@ -177,27 +221,19 @@ void loop()
   }
 }
 
-void broadcast()
+void broadcast(String message)
 {
-  if ((ip == "" || ip == "0.0.0.0") && setupDone)
-  {
-    return;
-  }
   String broadcastConnection = "AT+CIPSTART=3,\"UDP\",\"";
   broadcastConnection += broadcastIP;
   broadcastConnection += "\",";
   broadcastConnection += broadcastPort;
   Serial1.println(broadcastConnection);
   delay(100);
-  String broadcastReply = "AtmoOrb:";
-  broadcastReply += ip;
-  broadcastReply += ",";
-  broadcastReply += serverPort;
-  broadcastReply += ";";
+
   Serial1.print("AT+CIPSEND=3,");
-  Serial1.println(broadcastReply.length());
+  Serial1.println(message.length());
   delay(5);
-  Serial1.println(broadcastReply);
+  Serial1.println(message);
 }
 
 int hexToDec(String hex)
