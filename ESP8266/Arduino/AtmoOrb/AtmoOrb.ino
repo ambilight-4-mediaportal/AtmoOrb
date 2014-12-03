@@ -44,6 +44,7 @@ CRGB leds[NUM_LEDS];
 char serialBuffer[1000];
 String ip;
 boolean setupDone = false;
+boolean initialStart = false;
 long previousCheckIPMillis = 0; 
 long checkIPInterval = 5000;
 
@@ -53,7 +54,7 @@ void setup()
   FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
   for (int i = 0; i < NUM_LEDS; i++)
   {
-    leds[i] = CRGB(255,255,255);
+    leds[i] = CRGB(255, 255, 255);
   }
   FastLED.show();
   
@@ -65,17 +66,27 @@ void setup()
   Serial1.setTimeout(5);
   
   delay(1000);
+  
+  // Reset ESP8266
   Serial1.println("AT+RST");
   delay(10);
+  
+  // Change to Station mode
   Serial1.println("AT+CWMODE=1");
   delay(10);
+  
+  // Reset ESP8266
   Serial1.println("AT+RST");
   delay(10);
+  
+  // Disable DHCP
   if (disableDHCP == 1)
   {
     Serial1.println("AT+CWDHCP=2,1");
     delay(10);
   }
+  
+  // Join access point
   setupMessage = "AT+CWJAP=\"";
   setupMessage += wifiSSID;
   setupMessage += "\",\"";
@@ -83,6 +94,8 @@ void setup()
   setupMessage += "\"";
   Serial1.println(setupMessage);
   delay(5000);
+  
+  // Set static ip
   if (disableDHCP == 1)
   {
     setupMessage = "AT+CIPSTA=\"";
@@ -91,12 +104,24 @@ void setup()
     Serial1.println(setupMessage);
     delay(10);
   }
+  
+  // Enable multiple connections
   Serial1.println("AT+CIPMUX=1");
   delay(10);
+  
+  // Setup server
   setupMessage = "AT+CIPSERVER=1,";
   setupMessage += serverPort;
   Serial1.println(setupMessage);
   delay(10);
+  
+  // Setup client
+  setupMessage = "AT+CIPSTART=2,\"UDP\",\"";
+  setupMessage += broadcastIP;
+  setupMessage += "\",";
+  setupMessage += broadcastPort;
+  Serial1.println(setupMessage);
+  
   setupDone = true;
 }
 
@@ -120,14 +145,27 @@ void loop()
       {
         int start = message.indexOf("+CIFSR:STAIP");
         start = message.indexOf("\"", start) + 1; 
-        ip = message.substring(start, message.indexOf("\"", start));
-        Serial.println("IP: " + ip);
-        String broadcastMessage = "AtmoOrbAddress:";
-        broadcastMessage += ip;
-        broadcastMessage += ",";
-        broadcastMessage += serverPort;
-        broadcastMessage += ";";
-        broadcast(broadcastMessage);
+        if (isValidIp4(message.substring(start, message.indexOf("\"", start))) > 0)
+        {
+          ip = message.substring(start, message.indexOf("\"", start));
+          Serial.println("IP: " + ip);
+          String broadcastMessage = "AtmoOrbAddress:";
+          broadcastMessage += ip;
+          broadcastMessage += ",";
+          broadcastMessage += serverPort;
+          broadcastMessage += ";";
+          broadcast(broadcastMessage);
+          
+          if (!initialStart)
+          {
+            initialStart = true;
+            for (int i = 0; i < NUM_LEDS; i++)
+            {
+              leds[i] = CRGB(0, 0, 255);
+            }
+            FastLED.show();
+          }
+        }
       }
     }
     // AT pre 0.20 ip syntax
@@ -135,14 +173,27 @@ void loop()
     {
       int start = message.indexOf("AT+CIFSR");
       start = message.indexOf("\n", start) + 1;
-      ip = message.substring(start, message.indexOf("\n", start) - 1);
-      Serial.println("IP: " + ip);
-      String broadcastMessage = "AtmoOrbAddress:";
-      broadcastMessage += ip;
-      broadcastMessage += ",";
-      broadcastMessage += serverPort;
-      broadcastMessage += ";";
-      broadcast(broadcastMessage);
+      if (isValidIp4(message.substring(start, message.indexOf("\n", start) - 1)) > 0)
+      {
+        ip = message.substring(start, message.indexOf("\n", start) - 1);
+        Serial.println("IP: " + ip);
+        String broadcastMessage = "AtmoOrbAddress:";
+        broadcastMessage += ip;
+        broadcastMessage += ",";
+        broadcastMessage += serverPort;
+        broadcastMessage += ";";
+        broadcast(broadcastMessage);
+        
+        if (!initialStart)
+        {
+          initialStart = true;
+          for (int i = 0; i < NUM_LEDS; i++)
+          {
+            leds[i] = CRGB(0, 0, 255);
+          }
+          FastLED.show();
+        }
+      }
     }
     // Receiving boradcast messages not working with 0020000903, but with 0018000902-AI03
     // Not sure why. But static IP is supported.
@@ -223,14 +274,7 @@ void loop()
 
 void broadcast(String message)
 {
-  String broadcastConnection = "AT+CIPSTART=3,\"UDP\",\"";
-  broadcastConnection += broadcastIP;
-  broadcastConnection += "\",";
-  broadcastConnection += broadcastPort;
-  Serial1.println(broadcastConnection);
-  delay(100);
-
-  Serial1.print("AT+CIPSEND=3,");
+  Serial1.print("AT+CIPSEND=2,");
   Serial1.println(message.length());
   delay(5);
   Serial1.println(message);
@@ -242,4 +286,79 @@ int hexToDec(String hex)
   hex.toCharArray(hexChar, hex.length() + 1);
   char* hexPos = hexChar;
   return strtol(hexPos, &hexPos, 16);
+}
+
+// http://stackoverflow.com/questions/791982/determine-if-a-string-is-a-valid-ip-address-in-c/792645#792645
+int isValidIp4 (String ipString)
+{
+  char ipCharArray[ipString.length()];
+  int segs = 0;   /* Segment count. */
+  int chcnt = 0;  /* Character count within segment. */
+  int accum = 0;  /* Accumulator for segment. */
+    
+  ipString.toCharArray(ipCharArray, ipString.length());
+    
+  char* str = ipCharArray;
+    
+  /* Catch NULL pointer. */
+
+  if (str == NULL)
+  {
+    return 0;
+  }
+
+    /* Process every character in string. */
+  while (*str != '\0')
+  {
+    /* Segment changeover. */
+    if (*str == '.')
+    {
+      /* Must have some digits in segment. */
+      if (chcnt == 0)
+      {
+        return 0;
+      }
+
+      /* Limit number of segments. */
+      if (++segs == 4)
+      {
+        return 0;
+      }
+
+      /* Reset segment values and restart loop. */
+      chcnt = accum = 0;
+      str++;
+      continue;
+    }
+     
+    /* Check numeric. */
+    if ((*str < '0') || (*str > '9'))
+    {
+      return 0;
+    }
+
+    /* Accumulate and check segment. */
+    if ((accum = accum * 10 + *str - '0') > 255)
+    {
+      return 0;
+    }
+
+    /* Advance other segment specific stuff and continue loop. */
+    chcnt++;
+    str++;
+  }
+
+  /* Check enough segments and enough characters in last segment. */
+  if (segs != 3)
+  {
+    return 0;
+  }
+
+  if (chcnt == 0)
+  {
+    return 0;
+  }
+
+  /* Address okay. */
+  return 1;
 }
