@@ -30,14 +30,15 @@
 
 #define NUM_LEDS 24
 #define DATA_PIN 15
+// "ring" or "matrix"
+#define LED_GEO "ring"
 
-#define wifiSSID "Your SSID"
-#define wifiPassword "Your WiFi Password"
-#define disableDHCP 0
-#define staticIP "192.168.1.42"
-#define serverPort 30003
-#define broadcastIP "192.168.1.255"
-#define broadcastPort 30003
+#define WIFI_SSID "Your SSID"
+#define WIFI_PASSWORD "Your WiFi Password"
+#define DISABLE_DHCP 0
+#define STATIC_IP "192.168.1.42"
+#define BROADCAST_IP "192.168.1.255"
+#define PORT 30003
 
 CRGB leds[NUM_LEDS];
 
@@ -80,7 +81,7 @@ void setup()
   delay(10);
   
   // Disable DHCP
-  if (disableDHCP == 1)
+  if (DISABLE_DHCP == 1)
   {
     Serial1.println("AT+CWDHCP=2,1");
     delay(10);
@@ -88,18 +89,18 @@ void setup()
   
   // Join access point
   setupMessage = "AT+CWJAP=\"";
-  setupMessage += wifiSSID;
+  setupMessage += WIFI_SSID;
   setupMessage += "\",\"";
-  setupMessage += wifiPassword;
+  setupMessage += WIFI_PASSWORD;
   setupMessage += "\"";
   Serial1.println(setupMessage);
   delay(5000);
   
   // Set static ip
-  if (disableDHCP == 1)
+  if (DISABLE_DHCP == 1)
   {
     setupMessage = "AT+CIPSTA=\"";
-    setupMessage += staticIP;
+    setupMessage += STATIC_IP;
     setupMessage += "\"";
     Serial1.println(setupMessage);
     delay(10);
@@ -111,15 +112,15 @@ void setup()
   
   // Setup server
   setupMessage = "AT+CIPSERVER=1,";
-  setupMessage += serverPort;
+  setupMessage += PORT;
   Serial1.println(setupMessage);
   delay(10);
   
   // Setup client
   setupMessage = "AT+CIPSTART=2,\"UDP\",\"";
-  setupMessage += broadcastIP;
+  setupMessage += BROADCAST_IP;
   setupMessage += "\",";
-  setupMessage += broadcastPort;
+  setupMessage += PORT;
   Serial1.println(setupMessage);
   
   setupDone = true;
@@ -152,7 +153,7 @@ void loop()
           String broadcastMessage = "AtmoOrbAddress:";
           broadcastMessage += ip;
           broadcastMessage += ",";
-          broadcastMessage += serverPort;
+          broadcastMessage += PORT;
           broadcastMessage += ";";
           broadcast(broadcastMessage);
           
@@ -180,7 +181,7 @@ void loop()
         String broadcastMessage = "AtmoOrbAddress:";
         broadcastMessage += ip;
         broadcastMessage += ",";
-        broadcastMessage += serverPort;
+        broadcastMessage += PORT;
         broadcastMessage += ";";
         broadcast(broadcastMessage);
         
@@ -260,6 +261,13 @@ void loop()
     {
       String broadcastMessage = "AtmoOrbLEDCount:";
       broadcastMessage += NUM_LEDS;
+      broadcastMessage += ";";
+      broadcast(broadcastMessage);
+    }
+    else if (message.indexOf("getledgeo;") > -1)
+    {
+      String broadcastMessage = "AtmoOrbLEDGeo:";
+      broadcastMessage += LED_GEO;
       broadcastMessage += ";";
       broadcast(broadcastMessage);
     }
