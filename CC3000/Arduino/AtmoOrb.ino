@@ -2,14 +2,16 @@
 #include <SPI.h>
 #include <Adafruit_NeoPixel.h>
 
+
+// Wi-Fi
 #define ADAFRUIT_CC3000_IRQ   3
 #define ADAFRUIT_CC3000_VBAT  5
 #define ADAFRUIT_CC3000_CS    10
 Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ, ADAFRUIT_CC3000_VBAT,
                                          SPI_CLOCK_DIVIDER);
-
-#define WLAN_SSID       "Your SSID"
-#define WLAN_PASS       "Your WiFi Password"
+                                         
+#define WLAN_SSID "Your SSID"
+#define WLAN_PASS "Your WiFi Password"
 
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 
@@ -17,9 +19,16 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 
 Adafruit_CC3000_Server lightServer(LISTEN_PORT);
 
+#define BUFFER_SIZE  100
+#define TIMEOUT_MS   500
+char message[100];
+uint8_t buffer[BUFFER_SIZE+1];
+int bufindex = 0;
+
+// LEDS
 #define PIN 6
-#define NUM_PIXELS 24
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN, NEO_GRB + NEO_KHZ800);
+#define NUM_LEDS 24
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, PIN, NEO_GRB + NEO_KHZ800);
 
 void setup(void)
 {  
@@ -27,17 +36,18 @@ void setup(void)
   strip.show(); // Initialize all pixels to 'off'
   
   Serial.begin(115200);
+  while (!Serial);
   Serial.println(F("Hello, CC3000!\n")); 
-  
   /* Initialise the module */
-  Serial.println(F("\nInitializing..."));
+  Serial.println(F("\nInit..."));
+  
   if (!cc3000.begin())
   {
-    Serial.println(F("Couldn't begin()! Check your wiring?"));
-    while(1);
+    //Error
   }
   
-  Serial.print(F("\nAttempting to connect to ")); Serial.println(WLAN_SSID);
+  Serial.print(F("\nConnecting to ")); Serial.println(WLAN_SSID);
+  delay(1000);
   if (!cc3000.connectToAP(WLAN_SSID, WLAN_PASS, WLAN_SECURITY)) {
     Serial.println(F("Failed!"));
     while(1);
@@ -45,7 +55,6 @@ void setup(void)
    
   Serial.println(F("Connected!"));
   
-  Serial.println(F("Request DHCP"));
   while (!cc3000.checkDHCP())
   {
     delay(100);
@@ -53,7 +62,7 @@ void setup(void)
   
   lightServer.begin();
   
-  Serial.println(F("Listening for connections..."));
+  Serial.println(F("Listening..."));
 }
 
 void loop(void)
@@ -62,58 +71,71 @@ void loop(void)
   if (client) {
      if (client.available() > 0) {
       
-       int x = 0;
-       
-       uint8_t ch = client.read();
-       
-       int len = sizeof(ch);
-       String message = String(ch).substring(0,len-1);
-       Serial.println(F("Message:\r\n"));
-       Serial.println(message);
-       
-       int red = -1;
-       int green = -1;
-       int blue = -1;
-       
-       if (message.indexOf("setcolor:") > -1)
-       {         
-         int red = -1;
-         int green = -1;
-         int blue = -1;
-         
-         while (x < message.length())
+     int x = 0;
+     bufindex = 0;
+     memset(&buffer, 0, sizeof(buffer));
+     memset(&message, 0, sizeof(message));
+     unsigned long endtime = millis() + TIMEOUT_MS;
+
+     while ((millis() < endtime) && (bufindex < BUFFER_SIZE)) {
+       if (client.available()) {
+         buffer[bufindex++] = client.read();
+       }
+     }
+
+     String message = (char*)buffer;
+     message.trim();
+     
+     if(message.length() > 0)
+     {
+       if (message.indexOf("setcolors:") > -1)
+       {
+         int startPos = message.lastIndexOf("setcolors:") + 10;
+         boolean success = false;
+         int i = 0;
+         while (startPos < message.length())
          {
-           int start = message.indexOf("setcolor:", x);
-           int endValue1 = message.indexOf(',', start + 9);
-           int endValue2 = message.indexOf(',', endValue1 + 1);
-           int endValue3 = message.indexOf(';', endValue2 + 1);
-           
-           if (start == -1 || endValue1 == -1 || endValue2 == -1 || endValue3 == -1)
+           int endPos = message.indexOf(",", startPos);
+           if (endPos == -1 && message.indexOf(";", startPos))
+           {
+             endPos = message.indexOf(";", startPos);
+           }
+           if (endPos == -1)
            {
              break;
            }
-          
-           x = endValue3;
-           red = message.substring(start + 9, endValue1).toInt();
-           green = message.substring(endValue1 + 1, endValue2).toInt();
-           blue = message.substring(endValue2 + 1, endValue3).toInt();
-         }
-         
-         if (red != -1 && green != -1 && blue != -1)
-         {
-           
-           Serial.print("Red: "+ red);
-           Serial.print("Green: "+ green);
-           Serial.print("Blue: "+ blue);
+           if ((endPos - startPos) == 6 && i < NUM_LEDS)
+           {
+             success = true;
             
-           uint32_t color = strip.Color(red, green, blue);
-           uint16_t i;
-           for(i=0; i< strip.numPixels(); i++) {
-             strip.setPixelColor(i, color);
+             int red = hexToDec(message.substring(startPos, startPos + 2));
+             int green = hexToDec(message.substring(startPos + 2, startPos + 4));
+             int blue = hexToDec(message.substring(startPos + 4, startPos + 6));
+             
+             uint32_t color = strip.Color(red, green, blue);
+             uint16_t i;
+            
+             for(i=0; i< NUM_LEDS; i++) {
+              strip.setPixelColor(i, color);
+             }
            }
+           startPos = endPos + 1;
+         }
+         if (success)
+         {
            strip.show();
+         }
        }
+       Serial.println(message);
      }
-    }
+   }
   }
+}
+
+int hexToDec(String hex)
+{
+  char hexChar[hex.length()];
+  hex.toCharArray(hexChar, hex.length() + 1);
+  char* hexPos = hexChar;
+  return strtol(hexPos, &hexPos, 16);
 }
