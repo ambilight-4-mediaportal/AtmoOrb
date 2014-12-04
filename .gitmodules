@@ -8,4 +8,4 @@
 
 [submodule "Libraries/Adafruit_CC3000_Library"]
 	path = Libraries/Adafruit_CC3000_Library
-	url = https://github.com/adafruit/Adafruit_CC3000_Library.git
+	url = https://github.com/RickDB/Adafruit_CC3000_Library.git
