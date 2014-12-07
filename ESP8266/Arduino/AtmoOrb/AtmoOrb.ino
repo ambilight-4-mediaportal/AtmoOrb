@@ -28,7 +28,7 @@
 
 #include "FastLED.h"
 
-#define NUM_LEDS 24
+#define NUM_LEDS 27
 #define DATA_PIN 15
 // "ring" or "matrix"
 #define LED_GEO "ring"
@@ -42,31 +42,36 @@
 
 CRGB leds[NUM_LEDS];
 
-char serialBuffer[1000];
+char serialBuffer[500];
 String ip;
 boolean setupDone = false;
 boolean initialStart = false;
 long previousCheckIPMillis = 0; 
 long checkIPInterval = 5000;
+int tempRGB[NUM_LEDS][3];
+String tempString;
+
+
+#define SMOOTH_STEPS 10
+#define SMOOTH_DELAY 5
+
+int prevColor[NUM_LEDS][3];
+int nextColor[NUM_LEDS][3];
+int smoothStep = SMOOTH_STEPS;
+unsigned long smoothMillis = 0;
 
 
 void setup()
 {
   FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
-  for (int i = 0; i < NUM_LEDS; i++)
-  {
-    leds[i] = CRGB(255, 255, 255);
-  }
-  FastLED.show();
-  
-  String setupMessage = "";
-  
+    
   Serial.begin(115200);
   Serial.setTimeout(5);
   Serial1.begin(115200);
   Serial1.setTimeout(5);
   
-  delay(1000);
+  FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
+  
   
   // Reset ESP8266
   Serial1.println("AT+RST");
@@ -88,21 +93,21 @@ void setup()
   }
   
   // Join access point
-  setupMessage = "AT+CWJAP=\"";
-  setupMessage += WIFI_SSID;
-  setupMessage += "\",\"";
-  setupMessage += WIFI_PASSWORD;
-  setupMessage += "\"";
-  Serial1.println(setupMessage);
+  tempString = "AT+CWJAP=\"";
+  tempString += WIFI_SSID;
+  tempString += "\",\"";
+  tempString += WIFI_PASSWORD;
+  tempString += "\"";
+  Serial1.println(tempString);
   delay(5000);
   
   // Set static ip
   if (DISABLE_DHCP == 1)
   {
-    setupMessage = "AT+CIPSTA=\"";
-    setupMessage += STATIC_IP;
-    setupMessage += "\"";
-    Serial1.println(setupMessage);
+    tempString = "AT+CIPSTA=\"";
+    tempString += STATIC_IP;
+    tempString += "\"";
+    Serial1.println(tempString);
     delay(10);
   }
   
@@ -111,17 +116,17 @@ void setup()
   delay(10);
   
   // Setup server
-  setupMessage = "AT+CIPSERVER=1,";
-  setupMessage += PORT;
-  Serial1.println(setupMessage);
+  tempString = "AT+CIPSERVER=1,";
+  tempString += PORT;
+  Serial1.println(tempString);
   delay(10);
   
   // Setup client
-  setupMessage = "AT+CIPSTART=2,\"UDP\",\"";
-  setupMessage += BROADCAST_IP;
-  setupMessage += "\",";
-  setupMessage += PORT;
-  Serial1.println(setupMessage);
+  tempString = "AT+CIPSTART=2,\"UDP\",\"";
+  tempString += BROADCAST_IP;
+  tempString += "\",";
+  tempString += PORT;
+  Serial1.println(tempString);
   
   setupDone = true;
 }
@@ -131,114 +136,120 @@ void loop()
   if (Serial.available() > 0)
   {
      int len = Serial.readBytesUntil('<\n>', serialBuffer, sizeof(serialBuffer));
-     String message = String(serialBuffer).substring(0,len-1);
-     Serial1.println(message);
+     tempString = String(serialBuffer).substring(0,len-1);
+     Serial1.println(tempString);
   }
   if (Serial1.available() > 0)
   {
     int len = Serial1.readBytesUntil('<\n>', serialBuffer, sizeof(serialBuffer));
-    String message = String(serialBuffer).substring(0,len-1);
+    tempString = String(serialBuffer).substring(0,len-1);
 
     // AT 0.20 ip syntax
-    if (message.indexOf("+CIFSR:") > -1)
+    if (tempString.indexOf("+CIFSR:") > -1)
     {
-      if (message.indexOf("+CIFSR:STAIP") > -1)
+      if (tempString.indexOf("+CIFSR:STAIP") > -1)
       {
-        int start = message.indexOf("+CIFSR:STAIP");
-        start = message.indexOf("\"", start) + 1; 
-        if (isValidIp4(message.substring(start, message.indexOf("\"", start))) > 0)
+        int start = tempString.indexOf("+CIFSR:STAIP");
+        start = tempString.indexOf("\"", start) + 1; 
+        if (isValidIp4(tempString.substring(start, tempString.indexOf("\"", start))) > 0)
         {
-          ip = message.substring(start, message.indexOf("\"", start));
+          ip = tempString.substring(start, tempString.indexOf("\"", start));
           Serial.println("IP: " + ip);
-          String broadcastMessage = "AtmoOrbAddress:";
-          broadcastMessage += ip;
-          broadcastMessage += ",";
-          broadcastMessage += PORT;
-          broadcastMessage += ";";
-          broadcast(broadcastMessage);
+          tempString = "AtmoOrbAddress:";
+          tempString += ip;
+          tempString += ",";
+          tempString += PORT;
+          tempString += ";";
+          broadcast(tempString);
           
           if (!initialStart)
           {
             initialStart = true;
             for (int i = 0; i < NUM_LEDS; i++)
             {
-              leds[i] = CRGB(0, 0, 255);
+              tempRGB[i][0] = 0;
+              tempRGB[i][1] = 0;
+              tempRGB[i][2] = 255;
             }
-            FastLED.show();
+            setSmoothColors(tempRGB);
           }
         }
       }
     }
     // AT pre 0.20 ip syntax
-    else if (message.indexOf("AT+CIFSR") > -1)
+    else if (tempString.indexOf("AT+CIFSR") > -1)
     {
-      int start = message.indexOf("AT+CIFSR");
-      start = message.indexOf("\n", start) + 1;
-      if (isValidIp4(message.substring(start, message.indexOf("\n", start) - 1)) > 0)
+      int start = tempString.indexOf("AT+CIFSR");
+      start = tempString.indexOf("\n", start) + 1;
+      if (isValidIp4(tempString.substring(start, tempString.indexOf("\n", start) - 1)) > 0)
       {
-        ip = message.substring(start, message.indexOf("\n", start) - 1);
+        ip = tempString.substring(start, tempString.indexOf("\n", start) - 1);
         Serial.println("IP: " + ip);
-        String broadcastMessage = "AtmoOrbAddress:";
-        broadcastMessage += ip;
-        broadcastMessage += ",";
-        broadcastMessage += PORT;
-        broadcastMessage += ";";
-        broadcast(broadcastMessage);
+        tempString = "AtmoOrbAddress:";
+        tempString += ip;
+        tempString += ",";
+        tempString += PORT;
+        tempString += ";";
+        broadcast(tempString);
         
         if (!initialStart)
         {
           initialStart = true;
           for (int i = 0; i < NUM_LEDS; i++)
           {
-            leds[i] = CRGB(0, 0, 255);
+            tempRGB[i][0] = 0;
+            tempRGB[i][1] = 0;
+            tempRGB[i][2] = 255;
           }
-          FastLED.show();
+          setSmoothColors(tempRGB);
         }
       }
     }
     // Receiving boradcast messages not working with 0020000903, but with 0018000902-AI03
     // Not sure why. But static IP is supported.
-    else if (message.indexOf("M-SEARCH") > -1)
+    else if (tempString.indexOf("M-SEARCH") > -1)
     {
       Serial1.println("AT+CIFSR");
     }
-    else if (message.indexOf("setcolor:") > -1)
+    else if (tempString.indexOf("setcolor:") > -1)
     {
       int red = -1;
       int green = -1;
       int blue = -1;
-      int start = message.lastIndexOf("setcolor:") + 9;
-      int endValue = message.indexOf(';', start);
+      int start = tempString.lastIndexOf("setcolor:") + 9;
+      int endValue = tempString.indexOf(';', start);
 
       if (endValue == -1 || (endValue - start) != 6)
       {
         return;
       }
            
-      red = hexToDec(message.substring(start, start + 2));
-      green = hexToDec(message.substring(start + 2, start + 4));
-      blue = hexToDec(message.substring(start + 4, start + 6));
+      red = hexToDec(tempString.substring(start, start + 2));
+      green = hexToDec(tempString.substring(start + 2, start + 4));
+      blue = hexToDec(tempString.substring(start + 4, start + 6));
 
       if (red != -1 && green != -1 && blue != -1)
       {
-        for (int i = 0; i < NUM_LEDS; i++)
-        {
-          leds[i] = CRGB(red, green, blue);
-        }
-        FastLED.show();
+          for (int i = 0; i < NUM_LEDS; i++)
+          {
+            tempRGB[i][0] = red;
+            tempRGB[i][1] = green;
+            tempRGB[i][2] = blue;
+          }
+          setSmoothColors(tempRGB);
       }
     }
-    else if (message.indexOf("setcolors:") > -1)
+    else if (tempString.indexOf("setcolors:") > -1)
     {
-      int startPos = message.lastIndexOf("setcolors:") + 10;
+      int startPos = tempString.lastIndexOf("setcolors:") + 10;
       boolean success = false;
       int i = 0;
-      while (startPos < message.length())
+      while (startPos < tempString.length())
       {
-        int endPos = message.indexOf(",", startPos);
-        if (endPos == -1 && message.indexOf(";", startPos))
+        int endPos = tempString.indexOf(",", startPos);
+        if (endPos == -1 && tempString.indexOf(";", startPos))
         {
-          endPos = message.indexOf(";", startPos);
+          endPos = tempString.indexOf(";", startPos);
         }
         if (endPos == -1)
         {
@@ -247,36 +258,42 @@ void loop()
         if ((endPos - startPos) == 6 && i < NUM_LEDS)
         {
           success = true;
-          leds[i] = CRGB(hexToDec(message.substring(startPos, startPos + 2)), hexToDec(message.substring(startPos + 2, startPos + 4)), hexToDec(message.substring(startPos + 4, startPos + 6)));
+          tempRGB[i][0] = hexToDec(tempString.substring(startPos, startPos + 2));
+          tempRGB[i][1] = hexToDec(tempString.substring(startPos + 2, startPos + 4));
+          tempRGB[i][2] = hexToDec(tempString.substring(startPos + 4, startPos + 6));
           i++;
         }
         startPos = endPos + 1;
       }
       if (success)
       {
-        FastLED.show();
+        setSmoothColors(tempRGB);
       }
     }
-    else if (message.indexOf("getledcount;") > -1)
+    else if (tempString.indexOf("getledcount;") > -1)
     {
-      String broadcastMessage = "AtmoOrbLEDCount:";
-      broadcastMessage += NUM_LEDS;
-      broadcastMessage += ";";
-      broadcast(broadcastMessage);
+      tempString = "AtmoOrbLEDCount:";
+      tempString += NUM_LEDS;
+      tempString += ";";
+      broadcast(tempString);
     }
-    else if (message.indexOf("getledgeo;") > -1)
+    else if (tempString.indexOf("getledgeo;") > -1)
     {
-      String broadcastMessage = "AtmoOrbLEDGeo:";
-      broadcastMessage += LED_GEO;
-      broadcastMessage += ";";
-      broadcast(broadcastMessage);
+      tempString = "AtmoOrbLEDGeo:";
+      tempString += LED_GEO;
+      tempString += ";";
+      broadcast(tempString);
     }
-    Serial.println(message);
+    Serial.println(tempString);
   }
   if ((ip == "" || ip == "0.0.0.0") && setupDone && (millis() - previousCheckIPMillis > checkIPInterval))
   {
     Serial1.println("AT+CIFSR");
     previousCheckIPMillis = millis();
+  }
+  if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+  {
+    smoothColors();
   }
 }
 
@@ -369,4 +386,37 @@ int isValidIp4 (String ipString)
 
   /* Address okay. */
   return 1;
+}
+
+void setSmoothColors(int rgb[NUM_LEDS][3])
+{
+  for (int i = 0; i < NUM_LEDS; i++)
+  {
+    prevColor[i][0] = nextColor[i][0];
+    prevColor[i][1] = nextColor[i][1];
+    prevColor[i][2] = nextColor[i][2];
+    
+    nextColor[i][0] = rgb[i][0];
+    nextColor[i][1] = rgb[i][1];
+    nextColor[i][2] = rgb[i][2];
+  }
+  smoothStep = 0;
+  smoothMillis = millis();
+}
+
+void smoothColors()
+{ 
+  smoothStep++;
+  for (int i = 0; i < NUM_LEDS; i++)
+  {    
+    leds[i] = CRGB(prevColor[i][0] + (int)(((float)(nextColor[i][0] - prevColor[i][0]) / SMOOTH_STEPS) * smoothStep), prevColor[i][1] + (int)(((float)(nextColor[i][1] - prevColor[i][1]) / SMOOTH_STEPS) * smoothStep), prevColor[i][2] + (int)(((float)(nextColor[i][2] - prevColor[i][2]) / SMOOTH_STEPS) * smoothStep));
+    
+    if (smoothStep >= SMOOTH_STEPS)
+    {
+      prevColor[i][0] = nextColor[i][0];
+      prevColor[i][1] = nextColor[i][1];
+      prevColor[i][2] = nextColor[i][2];
+    }
+  }
+  FastLED.show();
 }
