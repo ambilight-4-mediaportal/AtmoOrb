@@ -31,7 +31,8 @@
 #define NUM_LEDS 27
 #define DATA_PIN 15
 // "ring" or "matrix"
-#define LED_GEO "ring"
+#define LED_ARRANGEMENT "ring"
+#define ID "1"
 
 #define WIFI_SSID "Your SSID"
 #define WIFI_PASSWORD "Your WiFi Password"
@@ -63,14 +64,12 @@ unsigned long smoothMillis = 0;
 
 void setup()
 {
-  FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
+  FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
     
   Serial.begin(115200);
   Serial.setTimeout(5);
   Serial1.begin(115200);
-  Serial1.setTimeout(5);
-  
-  FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);
+  Serial1.setTimeout(5); 
   
   
   // Reset ESP8266
@@ -155,7 +154,9 @@ void loop()
         {
           ip = tempString.substring(start, tempString.indexOf("\"", start));
           Serial.println("IP: " + ip);
-          tempString = "AtmoOrbAddress:";
+          tempString = "AtmoOrb:";
+          tempString += ID;
+          tempString += ":address:";
           tempString += ip;
           tempString += ",";
           tempString += PORT;
@@ -185,11 +186,13 @@ void loop()
       {
         ip = tempString.substring(start, tempString.indexOf("\n", start) - 1);
         Serial.println("IP: " + ip);
-        tempString = "AtmoOrbAddress:";
-        tempString += ip;
-        tempString += ",";
-        tempString += PORT;
-        tempString += ";";
+          tempString = "AtmoOrb:";
+          tempString += ID;
+          tempString += ":address:";
+          tempString += ip;
+          tempString += ",";
+          tempString += PORT;
+          tempString += ";";
         broadcast(tempString);
         
         if (!initialStart)
@@ -272,15 +275,19 @@ void loop()
     }
     else if (tempString.indexOf("getledcount;") > -1)
     {
-      tempString = "AtmoOrbLEDCount:";
+      tempString = "AtmoOrb:";
+      tempString += ID;
+      tempString += ":ledcount:";
       tempString += NUM_LEDS;
       tempString += ";";
       broadcast(tempString);
     }
     else if (tempString.indexOf("getledgeo;") > -1)
     {
-      tempString = "AtmoOrbLEDGeo:";
-      tempString += LED_GEO;
+      tempString = "AtmoOrb:arrangement:";
+      tempString += ID;
+      tempString += ":arrangement:";
+      tempString += LED_ARRANGEMENT;
       tempString += ";";
       broadcast(tempString);
     }
