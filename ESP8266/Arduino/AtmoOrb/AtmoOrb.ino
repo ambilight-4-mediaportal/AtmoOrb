@@ -28,39 +28,35 @@
 
 #include "FastLED.h"
 
-#define NUM_LEDS 27
-#define DATA_PIN 15
-// "ring" or "matrix"
-#define LED_ARRANGEMENT "ring"
-#define ID "1"
-
-#define WIFI_SSID "Your SSID"
-#define WIFI_PASSWORD "Your WiFi Password"
-#define DISABLE_DHCP 0
-#define STATIC_IP "192.168.1.42"
-#define BROADCAST_IP "192.168.1.255"
-#define PORT 30003
-
-#define DEBUG 1
+#define NUM_LEDS 27 // Number of leds
+#define DATA_PIN 15 // Data pin for leds
+#define LED_ARRANGEMENT "ring" // Arrangement of the leds (ring, ring2, ring3, matrix, snakematrix)
+#define ID "1" // Id of this lamp (can be string or integer)
+#define WIFI_SSID "Your SSID" // SSID of your wifi network
+#define WIFI_PASSWORD "Your WiFi Password" // Password to your wifi network
+#define DISABLE_DHCP 0 // Disable DHCP
+#define STATIC_IP "192.168.1.42" // Static ip if DHCP is disabled
+#define BROADCAST_IP "192.168.1.255" // Broadcast ip of your network
+#define PORT 30003 // Port you want to use for broadcasting and for the server
+#define SMOOTH_STEPS 20 // Steps to take for smoothing colors
+#define SMOOTH_DELAY 5 // Delay between smoothing steps
+#define DEBUG 1 // Debug via serial port
 
 CRGB leds[NUM_LEDS];
-
 char serialBuffer[500];
 String ip;
 boolean setupDone = false;
 boolean initialStart = false;
-long previousCheckIPMillis = 0; 
+unsigned long previousCheckIP = 0; 
 int checkIPInterval = 5000;
-
-#define SMOOTH_STEPS 20
-#define SMOOTH_DELAY 5
-
 byte prevColor[NUM_LEDS][3];
 byte nextColor[NUM_LEDS][3];
 byte currentColor[NUM_LEDS][3];
-
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis = 0;
+char* readyString = "ready";
+char* okString = "OK";
+char* noChangeString = "no change";
 
 
 void setup()
@@ -70,60 +66,63 @@ void setup()
   Serial.begin(115200);
   Serial.setTimeout(5);
   Serial1.begin(115200);
-  Serial1.setTimeout(5); 
-  
-  
+  Serial1.setTimeout(5000); 
+
   // Reset ESP8266
   Serial1.println(F("AT+RST"));
-  delay(10);
+  Serial1.find(readyString);
   
   // Change to Station mode
   Serial1.println(F("AT+CWMODE=1"));
-  delay(10);
+  Serial1.find(noChangeString);
   
   // Reset ESP8266
   Serial1.println(F("AT+RST"));
-  delay(10);
+  Serial1.find(readyString);
   
   // Disable DHCP
   if (DISABLE_DHCP == 1)
   {
     Serial1.println(F("AT+CWDHCP=2,1"));
-    delay(10);
+    Serial1.find(okString);
   }
-  
+    
   // Join access point
+  Serial1.setTimeout(10000);
   Serial1.print(F("AT+CWJAP=\""));
-  Serial1.print(F(WIFI_SSID));
+  Serial1.print(WIFI_SSID);
   Serial1.print(F("\",\""));
-  Serial1.print(F(WIFI_PASSWORD));
+  Serial1.print(WIFI_PASSWORD);
   Serial1.println(F("\""));
-  delay(5000);
+  Serial1.find(okString);
+  Serial1.setTimeout(5000);
   
   // Set static ip
   if (DISABLE_DHCP == 1)
   {
     Serial1.print(F("AT+CIPSTA=\""));
-    Serial1.print(F(STATIC_IP));
+    Serial1.print(STATIC_IP);
     Serial1.println(F("\""));
-    delay(10);
+    Serial1.find(okString);
   }
   
   // Enable multiple connections
   Serial1.println(F("AT+CIPMUX=1"));
-  delay(10);
+  Serial1.find(okString);
   
   // Setup server
   Serial1.print(F("AT+CIPSERVER=1,"));
   Serial1.println(PORT);
-  delay(10);
+  Serial1.find(okString);
   
   // Setup client
   Serial1.print(F("AT+CIPSTART=2,\"UDP\",\""));
-  Serial1.print(F(BROADCAST_IP));
+  Serial1.print(BROADCAST_IP);
   Serial1.print(F("\","));
   Serial1.println(PORT);
+  Serial1.find(okString);
   
+  Serial1.setTimeout(5);  
   setupDone = true;
 }
 
@@ -143,7 +142,7 @@ void loop()
         start = message.indexOf(F("\""), start) + 1; 
         if (isValidIp4(message.substring(start, message.indexOf(F("\""), start))) > 0)
         {
-          ip = message.substring(start, message.indexOf("\"", start));
+          ip = message.substring(start, message.indexOf(F("\""), start));
           ipReceived();
         }
       }
@@ -256,10 +255,10 @@ void loop()
   {
     smoothColors();
   }
-  if ((ip == "" || ip == F("0.0.0.0")) && setupDone && (millis() - previousCheckIPMillis > checkIPInterval))
+  if ((ip == "" || ip == F("0.0.0.0")) && setupDone && (millis() - previousCheckIP > checkIPInterval))
   {
     Serial1.println(F("AT+CIFSR"));
-    previousCheckIPMillis = millis();
+    previousCheckIP = millis();
   }
 }
 
@@ -267,7 +266,7 @@ void broadcast(String message)
 {
   Serial1.print(F("AT+CIPSEND=2,"));
   Serial1.println(message.length());
-  delay(5);
+  Serial1.find(">");
   Serial1.println(message);
 }
 
