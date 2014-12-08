@@ -57,6 +57,7 @@ int checkIPInterval = 5000;
 
 byte prevColor[NUM_LEDS][3];
 byte nextColor[NUM_LEDS][3];
+byte currentColor[NUM_LEDS][3];
 
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis = 0;
@@ -355,9 +356,9 @@ int isValidIp4 (String ipString)
 
 void setSmoothColor(byte index, byte red, byte green, byte blue)
 {
-  prevColor[index][0] = nextColor[index][0];
-  prevColor[index][1] = nextColor[index][1];
-  prevColor[index][2] = nextColor[index][2];
+  prevColor[index][0] = currentColor[index][0];
+  prevColor[index][1] = currentColor[index][1];
+  prevColor[index][2] = currentColor[index][2];
     
   nextColor[index][0] = red;
   nextColor[index][1] = green;
@@ -374,15 +375,11 @@ void smoothColors()
 { 
   smoothStep++;
   for (int i = 0; i < NUM_LEDS; i++)
-  {   
-    leds[i] = CRGB(prevColor[i][0] + (((nextColor[i][0] - prevColor[i][0]) * smoothStep) / SMOOTH_STEPS), prevColor[i][1] + (((nextColor[i][1] - prevColor[i][1]) * smoothStep) / SMOOTH_STEPS), prevColor[i][2] + (((nextColor[i][2] - prevColor[i][2]) * smoothStep) / SMOOTH_STEPS));
-    
-    if (smoothStep >= SMOOTH_STEPS)
-    {
-      prevColor[i][0] = nextColor[i][0];
-      prevColor[i][1] = nextColor[i][1];
-      prevColor[i][2] = nextColor[i][2];
-    }
+  {
+    currentColor[i][0] = prevColor[i][0] + (((nextColor[i][0] - prevColor[i][0]) * smoothStep) / SMOOTH_STEPS);
+    currentColor[i][1] = prevColor[i][1] + (((nextColor[i][1] - prevColor[i][1]) * smoothStep) / SMOOTH_STEPS);
+    currentColor[i][2] = prevColor[i][2] + (((nextColor[i][2] - prevColor[i][2]) * smoothStep) / SMOOTH_STEPS);
+    leds[i] = CRGB(currentColor[i][0], currentColor[i][1], currentColor[i][2]);
   }
   FastLED.show();
 }
