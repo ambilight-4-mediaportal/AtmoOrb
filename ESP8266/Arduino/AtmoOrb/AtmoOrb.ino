@@ -184,7 +184,7 @@ void loop()
 
       if (red != -1 && green != -1 && blue != -1)
       {
-        for (int i = 0; i < NUM_LEDS; i++)
+        for (byte i = 0; i < NUM_LEDS; i++)
         {
           setSmoothColor(i, red, green, blue);
         }
@@ -195,7 +195,7 @@ void loop()
     {
       int startPos = message.lastIndexOf(F("setcolors:")) + 10;
       boolean success = false;
-      int i = 0;
+      byte i = 0;
       while (startPos < message.length())
       {
         int endPos = message.indexOf(F(","), startPos);
@@ -271,7 +271,7 @@ void broadcast(String message)
   Serial1.println(message);
 }
 
-int hexToDec(String hex)
+byte hexToDec(String hex)
 {
   char hexChar[hex.length()];
   hex.toCharArray(hexChar, hex.length() + 1);
@@ -280,12 +280,12 @@ int hexToDec(String hex)
 }
 
 // http://stackoverflow.com/questions/791982/determine-if-a-string-is-a-valid-ip-address-in-c/792645#792645
-int isValidIp4 (String ipString)
+byte isValidIp4 (String ipString)
 {
   char ipCharArray[ipString.length()];
-  int segs = 0;   /* Segment count. */
-  int chcnt = 0;  /* Character count within segment. */
-  int accum = 0;  /* Accumulator for segment. */
+  byte segs = 0;   /* Segment count. */
+  byte chcnt = 0;  /* Character count within segment. */
+  byte accum = 0;  /* Accumulator for segment. */
     
   ipString.toCharArray(ipCharArray, ipString.length());
     
@@ -374,7 +374,7 @@ void resetSmooth()
 void smoothColors()
 { 
   smoothStep++;
-  for (int i = 0; i < NUM_LEDS; i++)
+  for (byte i = 0; i < NUM_LEDS; i++)
   {
     currentColor[i][0] = prevColor[i][0] + (((nextColor[i][0] - prevColor[i][0]) * smoothStep) / SMOOTH_STEPS);
     currentColor[i][1] = prevColor[i][1] + (((nextColor[i][1] - prevColor[i][1]) * smoothStep) / SMOOTH_STEPS);
@@ -403,7 +403,7 @@ void ipReceived()
   if (!initialStart)
   {
     initialStart = true;
-    for (int i = 0; i < NUM_LEDS; i++)
+    for (byte i = 0; i < NUM_LEDS; i++)
     {
       setSmoothColor(i, 0, 0, 255);
     }
