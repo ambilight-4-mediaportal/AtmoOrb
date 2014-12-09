@@ -38,9 +38,9 @@
 #define STATIC_IP "192.168.1.42" // Static ip if DHCP is disabled
 #define BROADCAST_IP "192.168.1.255" // Broadcast ip of your network
 #define PORT 30003 // Port you want to use for broadcasting and for the server
-#define SMOOTH_STEPS 20 // Steps to take for smoothing colors
-#define SMOOTH_DELAY 5 // Delay between smoothing steps
-#define DEBUG 1 // Debug via serial port
+#define SMOOTH_STEPS 50 // Steps to take for smoothing colors
+#define SMOOTH_DELAY 4 // Delay between smoothing steps
+#define DEBUG 0 // Debug via serial port
 
 CRGB leds[NUM_LEDS];
 char serialBuffer[500];
@@ -52,6 +52,7 @@ int checkIPInterval = 5000;
 byte prevColor[NUM_LEDS][3];
 byte nextColor[NUM_LEDS][3];
 byte currentColor[NUM_LEDS][3];
+int colorStepSize[NUM_LEDS][3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis = 0;
 char* readyString = "ready";
@@ -61,6 +62,8 @@ char* noChangeString = "no change";
 
 void setup()
 {
+  TXLED1;
+  
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
     
   Serial.begin(115200);
@@ -128,6 +131,7 @@ void setup()
 
 void loop()
 {
+  digitalWrite(17, HIGH);
   if (Serial1.available() > 0)
   {
     int len = Serial1.readBytes(serialBuffer, sizeof(serialBuffer));
@@ -355,13 +359,28 @@ byte isValidIp4 (String ipString)
 
 void setSmoothColor(byte index, byte red, byte green, byte blue)
 {
-  prevColor[index][0] = currentColor[index][0];
-  prevColor[index][1] = currentColor[index][1];
-  prevColor[index][2] = currentColor[index][2];
-    
   nextColor[index][0] = red;
   nextColor[index][1] = green;
   nextColor[index][2] = blue;
+  for (byte x = 0; x < 3; x++)
+  {
+    prevColor[index][x] = currentColor[index][x];
+      
+    // Calculate step size once and store it.
+    // Uses more memory, but makes the smoothing calculations 50% faster.
+    colorStepSize[index][x] = ((nextColor[index][x] - prevColor[index][x]) / SMOOTH_STEPS);
+    
+    // Add/substract 1 from the step size.
+    // This will make sure we will hit the target color and dont fall short.
+    if (nextColor[index][x] > prevColor[index][x])
+    { 
+      colorStepSize[index][x]++;
+    }
+    else if (nextColor[index][x] < prevColor[index][x])
+    {
+      colorStepSize[index][x]--;
+    }
+  }
 }
 
 void resetSmooth()
@@ -375,9 +394,24 @@ void smoothColors()
   smoothStep++;
   for (byte i = 0; i < NUM_LEDS; i++)
   {
-    currentColor[i][0] = prevColor[i][0] + (((nextColor[i][0] - prevColor[i][0]) * smoothStep) / SMOOTH_STEPS);
-    currentColor[i][1] = prevColor[i][1] + (((nextColor[i][1] - prevColor[i][1]) * smoothStep) / SMOOTH_STEPS);
-    currentColor[i][2] = prevColor[i][2] + (((nextColor[i][2] - prevColor[i][2]) * smoothStep) / SMOOTH_STEPS);
+    for (byte x = 0; x < 3; x++)
+    {
+      if ((colorStepSize[i][x] > 0 && (nextColor[i][x] - currentColor[i][x]) >= colorStepSize[i][x]) || (colorStepSize[i][x] < 0 && (nextColor[i][x] - currentColor[i][x]) <= colorStepSize[i][x]))
+      {
+        currentColor[i][x] = prevColor[i][x] + (colorStepSize[i][x] * smoothStep);
+      }
+      else
+      {
+        currentColor[i][x] = nextColor[i][x];
+      }
+      
+      // If we hit the target color already (due to us adding/substracting 1 to the step size) we stop smoothing for this color.
+      if ((colorStepSize[i][x] > 0 && currentColor[i][x] >= nextColor[i][x]) || (colorStepSize[i][x] < 0 && currentColor[i][x] <= nextColor[i][x]))
+      {
+        colorStepSize[i][x] = 0;
+        prevColor[i][x] = currentColor[i][x];
+      }
+    }
     leds[i] = CRGB(currentColor[i][0], currentColor[i][1], currentColor[i][2]);
   }
   FastLED.show();
@@ -404,7 +438,7 @@ void ipReceived()
     initialStart = true;
     for (byte i = 0; i < NUM_LEDS; i++)
     {
-      setSmoothColor(i, 0, 0, 255);
+      setSmoothColor(i, 0, 0, 25);
     }
     resetSmooth();
   }
