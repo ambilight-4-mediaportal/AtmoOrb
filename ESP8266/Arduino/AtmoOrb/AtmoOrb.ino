@@ -32,15 +32,18 @@
 #define DATA_PIN 15 // Data pin for leds
 #define LED_ARRANGEMENT "ring" // Arrangement of the leds (ring, ring2, ring3, matrix, snakematrix)
 #define ID "1" // Id of this lamp (can be string or integer)
-#define WIFI_SSID "Your SSID" // SSID of your wifi network
+#define WIFI_SSID "Your WiFi SSID" // SSID of your wifi network
 #define WIFI_PASSWORD "Your WiFi Password" // Password to your wifi network
 #define DISABLE_DHCP 0 // Disable DHCP
 #define STATIC_IP "192.168.1.42" // Static ip if DHCP is disabled
 #define BROADCAST_IP "192.168.1.255" // Broadcast ip of your network
 #define PORT 30003 // Port you want to use for broadcasting and for the server
-#define SMOOTH_STEPS 50 // Steps to take for smoothing colors
-#define SMOOTH_DELAY 4 // Delay between smoothing steps
-#define DEBUG 0 // Debug via serial port
+#define SMOOTH_STEPS 40 // Steps to take for smoothing colors
+#define SMOOTH_DELAY 5 // Delay between smoothing steps
+#define DEBUG 1 // Debug via serial port
+#define STARTUP_RED 0
+#define STARTUP_GREEN 0
+#define STARTUP_BLUE 200
 
 CRGB leds[NUM_LEDS];
 char serialBuffer[500];
@@ -49,12 +52,12 @@ boolean setupDone = false;
 boolean initialStart = false;
 unsigned long previousCheckIP = 0; 
 int checkIPInterval = 5000;
-byte prevColor[NUM_LEDS][3];
-byte nextColor[NUM_LEDS][3];
-byte currentColor[NUM_LEDS][3];
-int colorStepSize[NUM_LEDS][3];
+
+byte nextColor[3];
+byte prevColor[3];
 byte smoothStep = SMOOTH_STEPS;
-unsigned long smoothMillis = 0;
+unsigned long smoothMillis;
+
 char* readyString = "ready";
 char* okString = "OK";
 char* noChangeString = "no change";
@@ -63,9 +66,9 @@ char* noChangeString = "no change";
 void setup()
 {
   TXLED1;
-  
+
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
-    
+
   Serial.begin(115200);
   Serial.setTimeout(5);
   Serial1.begin(115200);
@@ -74,22 +77,22 @@ void setup()
   // Reset ESP8266
   Serial1.println(F("AT+RST"));
   Serial1.find(readyString);
-  
+
   // Change to Station mode
   Serial1.println(F("AT+CWMODE=1"));
   Serial1.find(noChangeString);
-  
+
   // Reset ESP8266
   Serial1.println(F("AT+RST"));
   Serial1.find(readyString);
-  
+
   // Disable DHCP
   if (DISABLE_DHCP == 1)
   {
     Serial1.println(F("AT+CWDHCP=2,1"));
     Serial1.find(okString);
   }
-    
+
   // Join access point
   Serial1.setTimeout(10000);
   Serial1.print(F("AT+CWJAP=\""));
@@ -99,7 +102,7 @@ void setup()
   Serial1.println(F("\""));
   Serial1.find(okString);
   Serial1.setTimeout(5000);
-  
+
   // Set static ip
   if (DISABLE_DHCP == 1)
   {
@@ -108,23 +111,22 @@ void setup()
     Serial1.println(F("\""));
     Serial1.find(okString);
   }
-  
+
   // Enable multiple connections
   Serial1.println(F("AT+CIPMUX=1"));
   Serial1.find(okString);
-  
+
   // Setup server
   Serial1.print(F("AT+CIPSERVER=1,"));
   Serial1.println(PORT);
   Serial1.find(okString);
-  
+
   // Setup client
   Serial1.print(F("AT+CIPSTART=2,\"UDP\",\""));
   Serial1.print(BROADCAST_IP);
   Serial1.print(F("\","));
   Serial1.println(PORT);
   Serial1.find(okString);
-  
   Serial1.setTimeout(5);  
   setupDone = true;
 }
@@ -136,7 +138,7 @@ void loop()
   {
     int len = Serial1.readBytes(serialBuffer, sizeof(serialBuffer));
     String message = String(serialBuffer).substring(0,len-1);
-            
+
     // AT 0.20 ip syntax
     if (message.indexOf(F("+CIFSR:")) > -1)
     {
@@ -180,47 +182,14 @@ void loop()
       {
         return;
       }
-           
+
       red = hexToDec(message.substring(start, start + 2));
       green = hexToDec(message.substring(start + 2, start + 4));
       blue = hexToDec(message.substring(start + 4, start + 6));
 
       if (red != -1 && green != -1 && blue != -1)
-      {
-        for (byte i = 0; i < NUM_LEDS; i++)
-        {
-          setSmoothColor(i, red, green, blue);
-        }
-        resetSmooth();
-      }
-    }
-    else if (message.indexOf(F("setcolors:")) > -1)
-    {
-      int startPos = message.lastIndexOf(F("setcolors:")) + 10;
-      boolean success = false;
-      byte i = 0;
-      while (startPos < message.length())
-      {
-        int endPos = message.indexOf(F(","), startPos);
-        if (endPos == -1 && message.indexOf(F(";"), startPos))
-        {
-          endPos = message.indexOf(F(";"), startPos);
-        }
-        if (endPos == -1)
-        {
-          break;
-        }
-        if ((endPos - startPos) == 6 && i < NUM_LEDS)
-        {
-          success = true;
-          setSmoothColor(i, hexToDec(message.substring(startPos, startPos + 2)), hexToDec(message.substring(startPos + 2, startPos + 4)), hexToDec(message.substring(startPos + 4, startPos + 6)));
-        }
-        startPos = endPos + 1;
-        i++;
-      }
-      if (success)
-      {
-        resetSmooth();
+      {    
+        setSmoothColor(red, green, blue);
       }
     }
     else if (message.indexOf(F("getledcount;")) > -1)
@@ -250,14 +219,14 @@ void loop()
   {
     if (Serial.available() > 0)
     {
-       int len = Serial.readBytes(serialBuffer, sizeof(serialBuffer));
-       String message = String(serialBuffer).substring(0,len-1);
-       Serial1.println(message);
+      int len = Serial.readBytes(serialBuffer, sizeof(serialBuffer));
+      String message = String(serialBuffer).substring(0,len-1);
+      Serial1.println(message);
     }
   }
   if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
   {
-    smoothColors();
+    smoothColor();
   }
   if ((ip == "" || ip == F("0.0.0.0")) && setupDone && (millis() - previousCheckIP > checkIPInterval))
   {
@@ -289,11 +258,11 @@ byte isValidIp4 (String ipString)
   byte segs = 0;   /* Segment count. */
   byte chcnt = 0;  /* Character count within segment. */
   byte accum = 0;  /* Accumulator for segment. */
-    
+
   ipString.toCharArray(ipCharArray, ipString.length());
-    
+
   char* str = ipCharArray;
-    
+
   /* Catch NULL pointer. */
 
   if (str == NULL)
@@ -301,7 +270,7 @@ byte isValidIp4 (String ipString)
     return 0;
   }
 
-    /* Process every character in string. */
+  /* Process every character in string. */
   while (*str != '\0')
   {
     /* Segment changeover. */
@@ -324,7 +293,7 @@ byte isValidIp4 (String ipString)
       str++;
       continue;
     }
-     
+
     /* Check numeric. */
     if ((*str < '0') || (*str > '9'))
     {
@@ -357,62 +326,34 @@ byte isValidIp4 (String ipString)
   return 1;
 }
 
-void setSmoothColor(byte index, byte red, byte green, byte blue)
+void setSmoothColor(byte red, byte green, byte blue)
 {
-  nextColor[index][0] = red;
-  nextColor[index][1] = green;
-  nextColor[index][2] = blue;
-  for (byte x = 0; x < 3; x++)
+  if (smoothStep == SMOOTH_STEPS)
   {
-    prevColor[index][x] = currentColor[index][x];
-      
-    // Calculate step size once and store it.
-    // Uses more memory, but makes the smoothing calculations 50% faster.
-    colorStepSize[index][x] = ((nextColor[index][x] - prevColor[index][x]) / SMOOTH_STEPS);
+    prevColor[0] = nextColor[0];
+    prevColor[1] = nextColor[1];
+    prevColor[2] = nextColor[2];
     
-    // Add/substract 1 from the step size.
-    // This will make sure we will hit the target color and dont fall short.
-    if (nextColor[index][x] > prevColor[index][x])
-    { 
-      colorStepSize[index][x]++;
-    }
-    else if (nextColor[index][x] < prevColor[index][x])
-    {
-      colorStepSize[index][x]--;
-    }
+    nextColor[0] = red;
+    nextColor[1] = green;
+    nextColor[2] = blue;
+    
+    smoothMillis = millis();
+    smoothStep = 0;
   }
 }
 
-void resetSmooth()
-{
-  smoothStep = 0;
-  smoothMillis = millis();
-}
-
-void smoothColors()
+void smoothColor()
 { 
   smoothStep++;
+
+  byte red = prevColor[0] + (((nextColor[0] - prevColor[0]) * smoothStep) / SMOOTH_STEPS);
+  byte green = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
+  byte blue = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
+
   for (byte i = 0; i < NUM_LEDS; i++)
   {
-    for (byte x = 0; x < 3; x++)
-    {
-      if ((colorStepSize[i][x] > 0 && (nextColor[i][x] - currentColor[i][x]) >= colorStepSize[i][x]) || (colorStepSize[i][x] < 0 && (nextColor[i][x] - currentColor[i][x]) <= colorStepSize[i][x]))
-      {
-        currentColor[i][x] = prevColor[i][x] + (colorStepSize[i][x] * smoothStep);
-      }
-      else
-      {
-        currentColor[i][x] = nextColor[i][x];
-      }
-      
-      // If we hit the target color already (due to us adding/substracting 1 to the step size) we stop smoothing for this color.
-      if ((colorStepSize[i][x] > 0 && currentColor[i][x] >= nextColor[i][x]) || (colorStepSize[i][x] < 0 && currentColor[i][x] <= nextColor[i][x]))
-      {
-        colorStepSize[i][x] = 0;
-        prevColor[i][x] = currentColor[i][x];
-      }
-    }
-    leds[i] = CRGB(currentColor[i][0], currentColor[i][1], currentColor[i][2]);
+    leds[i] = CRGB(red, green, blue);
   }
   FastLED.show();
 }
@@ -432,14 +373,11 @@ void ipReceived()
   tempString += PORT;
   tempString += F(";");
   broadcast(tempString);
-  
+
   if (!initialStart)
   {
     initialStart = true;
-    for (byte i = 0; i < NUM_LEDS; i++)
-    {
-      setSmoothColor(i, 0, 0, 25);
-    }
-    resetSmooth();
+    setSmoothColor(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE);
   }
 }
+
