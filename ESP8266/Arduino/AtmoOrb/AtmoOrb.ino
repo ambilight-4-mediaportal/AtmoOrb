@@ -30,7 +30,6 @@
 
 #define NUM_LEDS 27 // Number of leds
 #define DATA_PIN 15 // Data pin for leds
-#define LED_ARRANGEMENT "ring" // Arrangement of the leds (ring, ring2, ring3, matrix, snakematrix)
 #define ID "1" // Id of this lamp (can be string or integer)
 #define WIFI_SSID "Your WiFi SSID" // SSID of your wifi network
 #define WIFI_PASSWORD "Your WiFi Password" // Password to your wifi network
@@ -40,10 +39,11 @@
 #define PORT 30003 // Port you want to use for broadcasting and for the server
 #define SMOOTH_STEPS 40 // Steps to take for smoothing colors
 #define SMOOTH_DELAY 5 // Delay between smoothing steps
+#define SMOOTH_BLOCK 1 // Block incoming colors while smoothing
 #define DEBUG 1 // Debug via serial port
-#define STARTUP_RED 0
-#define STARTUP_GREEN 0
-#define STARTUP_BLUE 200
+#define STARTUP_RED 0 // Red value for startup color
+#define STARTUP_GREEN 0 // Green value for startup color
+#define STARTUP_BLUE 200 // Blue value for startup color
 
 CRGB leds[NUM_LEDS];
 char serialBuffer[500];
@@ -55,6 +55,7 @@ int checkIPInterval = 5000;
 
 byte nextColor[3];
 byte prevColor[3];
+byte currentColor[3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis;
 
@@ -192,22 +193,11 @@ void loop()
         setSmoothColor(red, green, blue);
       }
     }
-    else if (message.indexOf(F("getledcount;")) > -1)
+    else if (message.indexOf(F("PING")) > -1)
     {
       String tempString = F("AtmoOrb:");
       tempString += ID;
-      tempString += F(":ledcount:");
-      tempString += NUM_LEDS;
-      tempString += F(";");
-      broadcast(tempString);
-    }
-    else if (message.indexOf(F("getledgeo;")) > -1)
-    {
-      String tempString = F("AtmoOrb:arrangement:");
-      tempString += ID;
-      tempString += F(":arrangement:");
-      tempString += LED_ARRANGEMENT;
-      tempString += F(";");
+      tempString += F(":PONG;");
       broadcast(tempString);
     }
     if (DEBUG == 1)
@@ -235,6 +225,41 @@ void loop()
   }
 }
 
+// Set a new color to smooth to
+void setSmoothColor(byte red, byte green, byte blue)
+{
+  if (smoothStep == SMOOTH_STEPS || SMOOTH_BLOCK == 0)
+  {
+    prevColor[0] = currentColor[0];
+    prevColor[1] = currentColor[1];
+    prevColor[2] = currentColor[2];
+    
+    nextColor[0] = red;
+    nextColor[1] = green;
+    nextColor[2] = blue;
+    
+    smoothMillis = millis();
+    smoothStep = 0;
+  }
+}
+
+// Display one step to the next color
+void smoothColor()
+{ 
+  smoothStep++;
+
+  currentColor[0] = prevColor[0] + (((nextColor[0] - prevColor[0]) * smoothStep) / SMOOTH_STEPS);
+  currentColor[1] = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
+  currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
+
+  for (byte i = 0; i < NUM_LEDS; i++)
+  {
+    leds[i] = CRGB(currentColor[0], currentColor[1], currentColor[2]);
+  }
+  FastLED.show();
+}
+
+// Send a message via udp broadcast
 void broadcast(String message)
 {
   Serial1.print(F("AT+CIPSEND=2,"));
@@ -243,6 +268,31 @@ void broadcast(String message)
   Serial1.println(message);
 }
 
+// Broadcast ip and display startup color
+void ipReceived()
+{
+  if (DEBUG == 1)
+  {
+    Serial.print(F("IP: "));
+    Serial.println(ip);
+  }
+  String tempString = F("AtmoOrb:");
+  tempString += ID;
+  tempString += F(":address:");
+  tempString += ip;
+  tempString += F(",");
+  tempString += PORT;
+  tempString += F(";");
+  broadcast(tempString);
+
+  if (!initialStart)
+  {
+    initialStart = true;
+    setSmoothColor(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE);
+  }
+}
+
+// Convert a hex string into decimal
 byte hexToDec(String hex)
 {
   char hexChar[hex.length()];
@@ -251,6 +301,7 @@ byte hexToDec(String hex)
   return strtol(hexPos, &hexPos, 16);
 }
 
+// Evaluate an ip string
 // http://stackoverflow.com/questions/791982/determine-if-a-string-is-a-valid-ip-address-in-c/792645#792645
 byte isValidIp4 (String ipString)
 {
@@ -325,59 +376,3 @@ byte isValidIp4 (String ipString)
   /* Address okay. */
   return 1;
 }
-
-void setSmoothColor(byte red, byte green, byte blue)
-{
-  if (smoothStep == SMOOTH_STEPS)
-  {
-    prevColor[0] = nextColor[0];
-    prevColor[1] = nextColor[1];
-    prevColor[2] = nextColor[2];
-    
-    nextColor[0] = red;
-    nextColor[1] = green;
-    nextColor[2] = blue;
-    
-    smoothMillis = millis();
-    smoothStep = 0;
-  }
-}
-
-void smoothColor()
-{ 
-  smoothStep++;
-
-  byte red = prevColor[0] + (((nextColor[0] - prevColor[0]) * smoothStep) / SMOOTH_STEPS);
-  byte green = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
-  byte blue = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
-
-  for (byte i = 0; i < NUM_LEDS; i++)
-  {
-    leds[i] = CRGB(red, green, blue);
-  }
-  FastLED.show();
-}
-
-void ipReceived()
-{
-  if (DEBUG == 1)
-  {
-    Serial.print(F("IP: "));
-    Serial.println(ip);
-  }
-  String tempString = F("AtmoOrb:");
-  tempString += ID;
-  tempString += F(":address:");
-  tempString += ip;
-  tempString += F(",");
-  tempString += PORT;
-  tempString += F(";");
-  broadcast(tempString);
-
-  if (!initialStart)
-  {
-    initialStart = true;
-    setSmoothColor(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE);
-  }
-}
-
