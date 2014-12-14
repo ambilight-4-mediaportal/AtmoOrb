@@ -3,7 +3,7 @@
 // Developed for:
 // "Arduino" Micro Pro
 // ESP8266 Module Version 02
-// Firmware Version: 0020000903 (AT 0.20 & SDK 0.9.3)
+// Firmware Version: 0018000902-AI03 (AT 0.18 & SDK 0.9.2)
 //
 // Pin Connections:
 //
@@ -31,34 +31,42 @@
 #define NUM_LEDS 27 // Number of leds
 #define DATA_PIN 15 // Data pin for leds
 #define ID "1" // Id of this lamp (can be string or integer)
+
+// Network settings
 #define WIFI_SSID "Your WiFi SSID" // SSID of your wifi network
 #define WIFI_PASSWORD "Your WiFi Password" // Password to your wifi network
 #define DISABLE_DHCP 0 // Disable DHCP
 #define STATIC_IP "192.168.1.42" // Static ip if DHCP is disabled
 #define BROADCAST_IP "192.168.1.255" // Broadcast ip of your network
-#define PORT 30003 // Port you want to use for broadcasting and for the server
-#define SMOOTH_STEPS 40 // Steps to take for smoothing colors
-#define SMOOTH_DELAY 5 // Delay between smoothing steps
-#define SMOOTH_BLOCK 1 // Block incoming colors while smoothing
-#define DEBUG 1 // Debug via serial port
-#define STARTUP_RED 0 // Red value for startup color
-#define STARTUP_GREEN 0 // Green value for startup color
-#define STARTUP_BLUE 200 // Blue value for startup color
+#define PORT 49692 // Port you want to use for broadcasting and for the server
+
+// Smoothing
+#define SMOOTH_STEPS 50 // Steps to take for smoothing colors
+#define SMOOTH_DELAY 4 // Delay between smoothing steps
+#define SMOOTH_BLOCK 0 // Block incoming colors while smoothing
+
+// Startup color
+#define STARTUP_RED 0
+#define STARTUP_GREEN 0
+#define STARTUP_BLUE 200
+
+// White adjustment
+#define RED_CORRECTION 210
+#define GREEN_CORRECTION 255
+#define BLUE_CORRECTION 180
+
 
 CRGB leds[NUM_LEDS];
 char serialBuffer[500];
 String ip;
-boolean setupDone = false;
 boolean initialStart = false;
 unsigned long previousCheckIP = 0; 
 int checkIPInterval = 5000;
-
 byte nextColor[3];
 byte prevColor[3];
 byte currentColor[3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis;
-
 char* readyString = "ready";
 char* okString = "OK";
 char* noChangeString = "no change";
@@ -129,7 +137,6 @@ void setup()
   Serial1.println(PORT);
   Serial1.find(okString);
   Serial1.setTimeout(5);  
-  setupDone = true;
 }
 
 void loop()
@@ -184,10 +191,14 @@ void loop()
         return;
       }
 
-      red = hexToDec(message.substring(start, start + 2));
-      green = hexToDec(message.substring(start + 2, start + 4));
-      blue = hexToDec(message.substring(start + 4, start + 6));
-
+      String redHex = message.substring(start, start + 2);
+      String greenHex = message.substring(start + 2, start + 4);
+      String blueHex = message.substring(start + 4, start + 6);
+      
+      red = hexToDec(redHex);
+      green = hexToDec(greenHex);
+      blue = hexToDec(blueHex);
+      
       if (red != -1 && green != -1 && blue != -1)
       {    
         setSmoothColor(red, green, blue);
@@ -200,25 +211,19 @@ void loop()
       tempString += F(":PONG;");
       broadcast(tempString);
     }
-    if (DEBUG == 1)
-    {
-      Serial.println(message);
-    }
+    Serial.println(message);
   }
-  if (DEBUG == 1)
+  if (Serial.available() > 0)
   {
-    if (Serial.available() > 0)
-    {
-      int len = Serial.readBytes(serialBuffer, sizeof(serialBuffer));
-      String message = String(serialBuffer).substring(0,len-1);
-      Serial1.println(message);
-    }
+    int len = Serial.readBytes(serialBuffer, sizeof(serialBuffer));
+    String message = String(serialBuffer).substring(0,len-1);
+    Serial1.println(message);
   }
   if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
   {
     smoothColor();
   }
-  if ((ip == "" || ip == F("0.0.0.0")) && setupDone && (millis() - previousCheckIP > checkIPInterval))
+  if ((ip == F("") || ip == F("0.0.0.0")) && (millis() - previousCheckIP > checkIPInterval))
   {
     Serial1.println(F("AT+CIFSR"));
     previousCheckIP = millis();
@@ -230,6 +235,14 @@ void setSmoothColor(byte red, byte green, byte blue)
 {
   if (smoothStep == SMOOTH_STEPS || SMOOTH_BLOCK == 0)
   {
+    red = (red * RED_CORRECTION) / 255;
+    green = (green * GREEN_CORRECTION) / 255;
+    blue = (blue * BLUE_CORRECTION) / 255;
+    if (nextColor[0] == red && nextColor[1] == green && nextColor[2] == blue)
+    {
+      return;
+    }
+    
     prevColor[0] = currentColor[0];
     prevColor[1] = currentColor[1];
     prevColor[2] = currentColor[2];
@@ -247,10 +260,10 @@ void setSmoothColor(byte red, byte green, byte blue)
 void smoothColor()
 { 
   smoothStep++;
-
+  
   currentColor[0] = prevColor[0] + (((nextColor[0] - prevColor[0]) * smoothStep) / SMOOTH_STEPS);
   currentColor[1] = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
-  currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
+  currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);   
 
   for (byte i = 0; i < NUM_LEDS; i++)
   {
@@ -271,11 +284,8 @@ void broadcast(String message)
 // Broadcast ip and display startup color
 void ipReceived()
 {
-  if (DEBUG == 1)
-  {
-    Serial.print(F("IP: "));
-    Serial.println(ip);
-  }
+  Serial.print(F("IP: "));
+  Serial.println(ip);
   String tempString = F("AtmoOrb:");
   tempString += ID;
   tempString += F(":address:");
