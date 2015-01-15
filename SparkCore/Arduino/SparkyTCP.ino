@@ -23,6 +23,7 @@ char* hostname = "ORB01";
 #define PIXEL_PIN D2
 #define PIXEL_COUNT 24
 #define PIXEL_TYPE WS2812B
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 // Orb LED handling, smoothing etc..
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -39,9 +40,6 @@ unsigned long smoothMillis;
 #define RED_CORRECTION 210
 #define GREEN_CORRECTION 255
 #define BLUE_CORRECTION 180
-
-
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 void setup() {
     Serial.begin(115200);
@@ -90,13 +88,16 @@ void loop() {
               byte blue = -1;
               int start = message.lastIndexOf(F("setcolor:")) + 9;
               int endValue = message.indexOf(';', start);
+              
               if (endValue == -1 || (endValue - start) != 6)
               {
                 return;
               }
+              
               red = hexToDec(message.substring(start, start + 2));
               green = hexToDec(message.substring(start + 2, start + 4));
               blue = hexToDec(message.substring(start + 4, start + 6));
+              
               if (red != -1 && green != -1 && blue != -1)
               {
                 for (byte i = 0; i < PIXEL_COUNT; i++)
