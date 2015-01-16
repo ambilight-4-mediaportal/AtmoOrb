@@ -17,7 +17,7 @@ int bufindex = 0;
 // mDNS
 MDNSResponder mdns;
 bool isMDNS;
-char* hostname = "ORB01";
+char* hostname = "ORB001";
 
 // LEDS
 #define PIXEL_PIN D2
@@ -42,31 +42,33 @@ unsigned long smoothMillis;
 #define BLUE_CORRECTION 180
 
 void setup() {
-    Serial.begin(115200);
-    
-    //Setup MDNS
     IPAddress addr = WiFi.localIP();
     int32_t ip = (addr[0] * 16777216) + (addr[1] * 65536) + (addr[2] * 256) + (addr[3]);
     
+    // Setup MDNS
     isMDNS = mdns.begin(hostname, ip);
     
+    Serial.begin(115200);
     server.begin();
 }
 
 void loop() {
     
-    // Update mDNS record if it has started successfully
-    if(isMDNS)
-    { 
-     mdns.update();
-    }
+// Update mDNS record if it has started successfully
+if(isMDNS)
+{ 
+    mdns.update();
+}
 
-    TCPClient client = server.available();
-    
+TCPClient client = server.available();
+
     if(client)
     {
-      if(client.available() > 0)
+      while(client.connected())
       {
+          // Disconnect from cloud
+          Spark.disconnect();
+          
           bufindex = 0;
           memset(&buffer, 0, sizeof(buffer));
           unsigned long endtime = millis() + TIMEOUT_MS;
@@ -78,9 +80,10 @@ void loop() {
           }
           
           String message = (char*)buffer;
-    
+          
           if (message.length() > 0)
           {
+            //Serial.println(message);
             if (message.indexOf(F("setcolor:")) > -1)
             {
               byte red = -1;
@@ -110,7 +113,13 @@ void loop() {
               }
             }
           }
-      }
+        }
+              
+        // Reconnect to cloud and flush client
+        Spark.connect();
+        Serial.println("Clients gone...flushing");
+        client.flush();  //for safety
+        delay(400);
     }
 }
 
