@@ -7,6 +7,7 @@
 // TCP client
 int port = 49692;
 TCPServer server = TCPServer(port);
+TCPClient client;
 
 // TCP buffers
 #define BUFFER_SIZE  100
@@ -64,16 +65,16 @@ if(isMDNS)
 // Cloud connection status
 bool cloudy = true;
 
-TCPClient client = server.available();
-
-    if(client)
+    if(client.connected())
     {
-      //Serial.println("Connected clients:" + (String)client.connected());
-      //Serial.println("Connected avail:" + (String)client.available());
-      while(client.connected())
+      while(client.available())
       {
           // Disconnect from cloud
-          Spark.disconnect();
+          if(cloudy)
+          {
+            Spark.disconnect();
+          }
+          
           cloudy = false;
           
           bufindex = 0;
@@ -118,8 +119,6 @@ TCPClient client = server.available();
           {
             smoothColor();
           }
-          
-          client.flush();
       }
               
       // Reconnect to cloud if needed and flush client
@@ -127,10 +126,10 @@ TCPClient client = server.available();
       {
         Spark.connect();
       }
-    
-      client.flush();  //for safety
-      delay(400);
-      client.stop();
+    }
+    else
+    {
+      client = server.available();
     }
 }
 
