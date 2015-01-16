@@ -42,6 +42,7 @@ unsigned long smoothMillis;
 #define BLUE_CORRECTION 180
 
 void setup() {
+    
     IPAddress addr = WiFi.localIP();
     int32_t ip = (addr[0] * 16777216) + (addr[1] * 65536) + (addr[2] * 256) + (addr[3]);
     
@@ -60,14 +61,20 @@ if(isMDNS)
     mdns.update();
 }
 
+// Cloud connection status
+bool cloudy = true;
+
 TCPClient client = server.available();
 
     if(client)
     {
+      //Serial.println("Connected clients:" + (String)client.connected());
+      //Serial.println("Connected avail:" + (String)client.available());
       while(client.connected())
       {
           // Disconnect from cloud
           Spark.disconnect();
+          cloudy = false;
           
           bufindex = 0;
           memset(&buffer, 0, sizeof(buffer));
@@ -80,12 +87,11 @@ TCPClient client = server.available();
           }
           
           String message = (char*)buffer;
-          
           if (message.length() > 0)
           {
-            //Serial.println(message);
             if (message.indexOf(F("setcolor:")) > -1)
             {
+              Serial.println(message);
               byte red = -1;
               byte green = -1;
               byte blue = -1;
@@ -103,23 +109,28 @@ TCPClient client = server.available();
               
               if (red != -1 && green != -1 && blue != -1)
               {
-                for (byte i = 0; i < PIXEL_COUNT; i++)
-                {
-                  setSmoothColor(red, green, blue);
-                  //strip.setPixelColor(i, red, green, blue);
-                }
-                //strip.show();
                 setSmoothColor(red, green, blue);
               }
             }
           }
-        }
+          
+          if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+          {
+            smoothColor();
+          }
+          
+          client.flush();
+      }
               
-        // Reconnect to cloud and flush client
+      // Reconnect to cloud if needed and flush client
+      if(!cloudy)
+      {
         Spark.connect();
-        Serial.println("Clients gone...flushing");
-        client.flush();  //for safety
-        delay(400);
+      }
+    
+      client.flush();  //for safety
+      delay(400);
+      client.stop();
     }
 }
 
@@ -161,13 +172,13 @@ void setSmoothColor(byte red, byte green, byte blue)
 void smoothColor()
 {
     smoothStep++;
-    byte red = prevColor[0] + (((nextColor[0] - prevColor[0]) * smoothStep) / SMOOTH_STEPS);
-    byte green = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
-    byte blue = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
+    currentColor[0] = prevColor[0] + (((nextColor[0] - prevColor[0]) * smoothStep) / SMOOTH_STEPS);
+    currentColor[1] = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
+    currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
     
     for (byte i = 0; i < PIXEL_COUNT; i++)
     {
-        strip.setPixelColor(i, red, green, blue);
+        strip.setPixelColor(i, currentColor[0], currentColor[1], currentColor[2]);
     }
     
     strip.show();
