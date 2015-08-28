@@ -1,12 +1,22 @@
 // This #include statement was automatically added by the Particle IDE.
+#include "MDNS/MDNS.h"
+
+// This #include statement was automatically added by the Particle IDE.
 #include "neopixel/neopixel.h"
 
-// telnet defaults to port 23
-TCPServer server = TCPServer(49692);
+// TCP server
+#define serverPort 49692
+
+TCPServer server = TCPServer(serverPort);
 TCPClient client;
 
-// Cloud status
-bool cloudy = true;
+// CLOUD status
+bool cloudEnabled = true;
+
+// mDNS
+MDNS mdns;
+bool MDNSactive;
+char* hostname = "ORB001";
 
 // LEDS
 #define PIXEL_PIN D6
@@ -42,10 +52,25 @@ void setup()
   // start listening for clients
   server.begin();
   
+  // Init leds
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
 
- 
+  bool success = mdns.setHostname(hostname);
+    
+  if (success) {
+    success = mdns.setService("tcp", "light", serverPort, hostname);
+  }
+    
+  if (success) {
+    success = mdns.addTXTEntry("orbID", "1");
+  }
+    
+  if (success) {
+    success = mdns.begin();
+    MDNSactive = true;
+  }
+
   // Make sure your Serial Terminal app is closed before powering your device
   /*
   
@@ -63,10 +88,10 @@ void loop()
 {
     if (client.connected()) {
         
-        if(cloudy)
+        if(cloudEnabled)
         {
             Spark.disconnect();
-            cloudy = false;
+            cloudEnabled = false;
         }
         
         while (client.available()) {
@@ -106,25 +131,31 @@ void loop()
         }
         
     } 
-    else {
-        
-        if(!cloudy)
+    else 
+    {
+        if(!cloudEnabled)
         {
             Spark.connect();
-            cloudy = true;
+            cloudEnabled = true;
         }
         
         // if no client is yet connected, check for a new connection
         client = server.available();
+        
+        // Update mDNS record if it has started successfully
+        if(MDNSactive)
+        { 
+            mdns.processQueries();
+        }
     }
 }
 
-// Force all leds OFF
-void forceLedsOFF()
+// Set color manually
+void setColor(byte red, byte green, byte blue)
 {
     for (byte i = 0; i < PIXEL_COUNT; i++)
     {
-        strip.setPixelColor(i, 0, 0, 0);
+        strip.setPixelColor(i, red, green, blue);
     }
     
     strip.show();
@@ -171,4 +202,10 @@ void smoothColor()
     }
     
     strip.show();
+}
+
+// Force all leds OFF
+void forceLedsOFF()
+{
+    setColor(0,0,0);
 }

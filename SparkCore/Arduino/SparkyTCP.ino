@@ -1,32 +1,35 @@
-// This #include statement was automatically added by the Spark IDE.
+// This #include statement was automatically added by the Particle IDE.
+#include "MDNS/MDNS.h"
+
+// This #include statement was automatically added by the Particle IDE.
 #include "neopixel/neopixel.h"
 
-// This #include statement was automatically added by the Spark IDE.
-#include "mdns/mdns.h"
+// TCP server
+#define serverPort 49692
 
-// TCP client
-int port = 49692;
-TCPServer server = TCPServer(port);
+TCPServer server = TCPServer(serverPort);
 TCPClient client;
 
-// TCP buffers
-#define BUFFER_SIZE  100
-#define TIMEOUT_MS   500
-uint8_t buffer[BUFFER_SIZE + 1];
-int bufindex = 0;
+// CLOUD status
+bool cloudEnabled = true;
 
 // mDNS
-MDNSResponder mdns;
-bool isMDNS;
+MDNS mdns;
+bool MDNSactive;
 char* hostname = "ORB001";
 
 // LEDS
-#define PIXEL_PIN D2
+#define PIXEL_PIN D6
 #define PIXEL_COUNT 24
 #define PIXEL_TYPE WS2812B
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
-// Orb LED handling, smoothing etc..
+// TCP buffers
+#define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
+#define TIMEOUT_MS   500
+uint8_t buffer[BUFFER_SIZE];
+
+// Smoothing
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
 #define SMOOTH_DELAY 4 // Delay between smoothing steps
 #define SMOOTH_BLOCK 0 // Block incoming colors while smoothing
@@ -36,112 +39,127 @@ byte prevColor[3];
 byte currentColor[3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis;
+unsigned int forceOff;
 
 // White adjustment
+
 #define RED_CORRECTION 210
 #define GREEN_CORRECTION 255
 #define BLUE_CORRECTION 180
 
-void setup() {
-    
-    IPAddress addr = WiFi.localIP();
-    int32_t ip = (addr[0] * 16777216) + (addr[1] * 65536) + (addr[2] * 256) + (addr[3]);
-    
-    // Setup MDNS
-    isMDNS = mdns.begin(hostname, ip);
-    
-    Serial.begin(115200);
-    server.begin();
-}
-
-void loop() {
-    
-// Update mDNS record if it has started successfully
-if(isMDNS)
-{ 
-    mdns.update();
-}
-
-// Cloud connection status
-bool cloudy = true;
-
-    if(client.connected())
-    {
-      while(client.available())
-      {
-          // Disconnect from cloud
-          if(cloudy)
-          {
-            Spark.disconnect();
-          }
-          
-          cloudy = false;
-          
-          bufindex = 0;
-          memset(&buffer, 0, sizeof(buffer));
-          unsigned long endtime = millis() + TIMEOUT_MS;
-    
-          while ((millis() < endtime) && (bufindex < BUFFER_SIZE)) {
-            if (client.available()) {
-              buffer[bufindex++] = client.read();
-            }
-          }
-          
-          String message = (char*)buffer;
-          if (message.length() > 0)
-          {
-            if (message.indexOf(F("setcolor:")) > -1)
-            {
-              Serial.println(message);
-              byte red = -1;
-              byte green = -1;
-              byte blue = -1;
-              int start = message.lastIndexOf(F("setcolor:")) + 9;
-              int endValue = message.indexOf(';', start);
-              
-              if (endValue == -1 || (endValue - start) != 6)
-              {
-                return;
-              }
-              
-              red = hexToDec(message.substring(start, start + 2));
-              green = hexToDec(message.substring(start + 2, start + 4));
-              blue = hexToDec(message.substring(start + 4, start + 6));
-              
-              if (red != -1 && green != -1 && blue != -1)
-              {
-                setSmoothColor(red, green, blue);
-              }
-            }
-          }
-          
-          if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
-          {
-            smoothColor();
-          }
-      }
-              
-      // Reconnect to cloud if needed and flush client
-      if(!cloudy)
-      {
-        Spark.connect();
-      }
-    }
-    else
-    {
-      client = server.available();
-    }
-}
-
-// Convert a hex string into decimal
-byte hexToDec(String hex)
+void setup()
 {
-    char hexChar[hex.length()];
-    hex.toCharArray(hexChar, hex.length() + 1);
-    char* hexPos = hexChar;
-    return strtol(hexPos, &hexPos, 16);
+  // start listening for clients
+  server.begin();
+  
+  // Init leds
+  strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
+
+  bool success = mdns.setHostname(hostname);
+    
+  if (success) {
+    success = mdns.setService("tcp", "light", serverPort, hostname);
+  }
+    
+  if (success) {
+    success = mdns.addTXTEntry("orbID", "1");
+  }
+    
+  if (success) {
+    success = mdns.begin();
+    MDNSactive = true;
+  }
+
+  // Make sure your Serial Terminal app is closed before powering your device
+  /*
+  
+  // Now open your Serial Terminal, and hit any key to continue!
+  //while(!Serial.available()) SPARK_WLAN_Loop();
+  
+  Serial.begin(115200);
+  Serial.println(WiFi.localIP());
+  Serial.println(WiFi.subnetMask());
+  Serial.println(WiFi.gatewayIP());
+  Serial.println(WiFi.SSID());*/
 }
 
+void loop()
+{
+    if (client.connected()) {
+        
+        if(cloudEnabled)
+        {
+            Spark.disconnect();
+            cloudEnabled = false;
+        }
+        
+        while (client.available()) {
+            unsigned int i = 0;
+            unsigned long endtime = millis() + TIMEOUT_MS;
+
+            while ((millis() < endtime) && (i < BUFFER_SIZE)) {
+                if (client.available()) {
+                    buffer[i++] = client.read();
+                }
+            }
+
+            if(i == BUFFER_SIZE){
+                i = 0;
+
+                // Look for 0xC0FFEE
+                if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
+                    
+                    //unsigned int pixels = buffer[i++];
+                    forceOff = buffer[i++];
+                    byte red =  buffer[i++];
+                    byte green =  buffer[i++];
+                    byte blue =  buffer[i++];
+                    
+                    setSmoothColor(red, green, blue);
+                }
+            }
+        }
+             
+        if(forceOff > 0)
+        {
+            forceLedsOFF();
+        }
+        else if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+        {
+            smoothColor();
+        }
+        
+    } 
+    else 
+    {
+        if(!cloudEnabled)
+        {
+            Spark.connect();
+            cloudEnabled = true;
+        }
+        
+        // if no client is yet connected, check for a new connection
+        client = server.available();
+        
+        // Update mDNS record if it has started successfully
+        if(MDNSactive)
+        { 
+            mdns.processQueries();
+        }
+    }
+}
+
+// Set color manually
+void setColor(byte red, byte green, byte blue)
+{
+    for (byte i = 0; i < PIXEL_COUNT; i++)
+    {
+        strip.setPixelColor(i, red, green, blue);
+    }
+    
+    strip.show();
+}
 
 // Set a new color to smooth to
 void setSmoothColor(byte red, byte green, byte blue)
@@ -154,19 +172,22 @@ void setSmoothColor(byte red, byte green, byte blue)
         
         if (nextColor[0] == red && nextColor[1] == green && nextColor[2] == blue)
         {
-            return;
+          return;
         }
         
         prevColor[0] = currentColor[0];
         prevColor[1] = currentColor[1];
         prevColor[2] = currentColor[2];
+        
         nextColor[0] = red;
         nextColor[1] = green;
         nextColor[2] = blue;
+        
         smoothMillis = millis();
         smoothStep = 0;
     }
 }
+
 // Display one step to the next color
 void smoothColor()
 {
@@ -181,4 +202,10 @@ void smoothColor()
     }
     
     strip.show();
+}
+
+// Force all leds OFF
+void forceLedsOFF()
+{
+    setColor(0,0,0);
 }
