@@ -1,5 +1,5 @@
 // This #include statement was automatically added by the Particle IDE.
-#include "MDNS/MDNS.h"
+//#include "MDNS/MDNS.h"
 
 // This #include statement was automatically added by the Particle IDE.
 #include "neopixel/neopixel.h"
@@ -14,9 +14,9 @@ TCPClient client;
 bool cloudEnabled = true;
 
 // mDNS
-MDNS mdns;
-bool MDNSactive;
-char* hostname = "ORB001";
+//MDNS mdns;
+//bool MDNSactive;
+//char* hostname = "ORB001";
 
 // LEDS
 #define PIXEL_PIN D6
@@ -26,7 +26,6 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 // TCP buffers
 #define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
-#define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
 
 // Smoothing
@@ -43,9 +42,9 @@ unsigned int forceOff;
 
 // White adjustment
 
-#define RED_CORRECTION 210
+#define RED_CORRECTION 255
 #define GREEN_CORRECTION 255
-#define BLUE_CORRECTION 180
+#define BLUE_CORRECTION 255
 
 void setup()
 {
@@ -56,6 +55,7 @@ void setup()
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
 
+  /*
   bool success = mdns.setHostname(hostname);
     
   if (success) {
@@ -70,6 +70,7 @@ void setup()
     success = mdns.begin();
     MDNSactive = true;
   }
+  */
 
   // Make sure your Serial Terminal app is closed before powering your device
   /*
@@ -81,7 +82,8 @@ void setup()
   Serial.println(WiFi.localIP());
   Serial.println(WiFi.subnetMask());
   Serial.println(WiFi.gatewayIP());
-  Serial.println(WiFi.SSID());*/
+  Serial.println(WiFi.SSID());
+  */
 }
 
 void loop()
@@ -90,23 +92,18 @@ void loop()
         
         if(cloudEnabled)
         {
+            // Disconnect from cloud to increase performance
             Spark.disconnect();
             cloudEnabled = false;
         }
         
         while (client.available()) {
+            client.read(buffer, BUFFER_SIZE);
             unsigned int i = 0;
-            unsigned long endtime = millis() + TIMEOUT_MS;
-
-            while ((millis() < endtime) && (i < BUFFER_SIZE)) {
-                if (client.available()) {
-                    buffer[i++] = client.read();
-                }
-            }
 
             if(i == BUFFER_SIZE){
                 i = 0;
-
+                
                 // Look for 0xC0FFEE
                 if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
                     
@@ -119,8 +116,8 @@ void loop()
                     setSmoothColor(red, green, blue);
                 }
             }
+
         }
-             
         if(forceOff > 0)
         {
             forceLedsOFF();
@@ -129,27 +126,34 @@ void loop()
         {
             smoothColor();
         }
-        
     } 
     else 
     {
         if(!cloudEnabled)
         {
+            // Reconnect to cloud
             Spark.connect();
             cloudEnabled = true;
         }
         
+        isClientAvailable();
         // if no client is yet connected, check for a new connection
-        client = server.available();
+        
         
         // Update mDNS record if it has started successfully
+        /*
         if(MDNSactive)
         { 
             mdns.processQueries();
-        }
+        }*/
     }
 }
 
+void isClientAvailable()
+{
+    // Check if client is connected
+    client = server.available();
+}
 // Set color manually
 void setColor(byte red, byte green, byte blue)
 {
@@ -208,4 +212,13 @@ void smoothColor()
 void forceLedsOFF()
 {
     setColor(0,0,0);
+    clearSmoothColors();
+}
+
+// Clear smooth color byte arrays
+void clearSmoothColors()
+{
+    memset(prevColor, 0, sizeof(prevColor));
+    memset(currentColor, 0, sizeof(nextColor));
+    memset(nextColor, 0, sizeof(nextColor));
 }
