@@ -3,9 +3,8 @@
 
 // UDP SETTINGS
 #define SERVER_PORT 49692
-#define HOSTNAME "ORB002"
-
 UDP client;
+IPAddress multicastIP(239, 15, 18, 2);
 
 // LED SETTINGS
 #define PIXEL_PIN D6
@@ -41,7 +40,7 @@ void setup()
     client.begin(SERVER_PORT);
     
     // Join Orb multicast group
-    client.joinMulticast(IPAddress(239, 15, 18, 2));
+    client.joinMulticast(multicastIP);
     
     // Init leds
     strip.begin();
@@ -68,7 +67,7 @@ void loop(){
         }
         
     }else if(packetSize > 0){
-        //Serial.println("Got malformed packet");
+        // Got malformed packet
     }
     
     if(commandOptions == 1)
