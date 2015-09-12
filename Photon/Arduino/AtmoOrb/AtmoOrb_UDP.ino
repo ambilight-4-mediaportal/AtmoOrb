@@ -3,7 +3,7 @@
 
 // UDP SETTINGS
 #define SERVER_PORT 49692
-#define HOSTNAME "ORB001"
+#define HOSTNAME "ORB002"
 
 UDP client;
 
@@ -39,24 +39,13 @@ void setup()
 {
     // Init UDP
     client.begin(SERVER_PORT);
-  
+    
+    // Join Orb multicast group
+    client.joinMulticast(IPAddress(224, 15, 18, 2));
+    
     // Init leds
     strip.begin();
     strip.show(); // Initialize all pixels to 'off'
-
-    // Make sure your Serial Terminal app is closed before powering your device
-
-    // Now open your Serial Terminal, and hit any key to continue!
-	
-    /*
-    while(!Serial.available()) SPARK_WLAN_Loop();
-      
-    Serial.begin(115200);
-    Serial.println(WiFi.localIP());
-    Serial.println(WiFi.subnetMask());
-    Serial.println(WiFi.gatewayIP());
-    Serial.println(WiFi.SSID());
-	*/
 }
 
 void loop(){
@@ -75,26 +64,8 @@ void loop(){
             byte red =  buffer[i++];
             byte green =  buffer[i++];
             byte blue =  buffer[i++];
-            
-            // Serial.print("Got color: ");
-            // Serial.print(red, 16);
-            // Serial.print(green, 16);
-            // Serial.print(blue, 16);
-            // Serial.println();
-        
             setSmoothColor(red, green, blue);
         }
-        
-        /*
-        // Store sender ip and port
-        IPAddress ipAddress = client.remoteIP();
-        int port = client.remotePort();
-    
-        // Echo back data to sender
-        client.beginPacket(ipAddress, port);
-        client.write(1);
-        client.endPacket();
-        */
         
     }else if(packetSize > 0){
         //Serial.println("Got malformed packet");
