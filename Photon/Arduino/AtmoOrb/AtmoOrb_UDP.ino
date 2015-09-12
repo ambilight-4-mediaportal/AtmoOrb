@@ -41,7 +41,7 @@ void setup()
     client.begin(SERVER_PORT);
     
     // Join Orb multicast group
-    client.joinMulticast(IPAddress(224, 15, 18, 2));
+    client.joinMulticast(IPAddress(239, 15, 18, 2));
     
     // Init leds
     strip.begin();
