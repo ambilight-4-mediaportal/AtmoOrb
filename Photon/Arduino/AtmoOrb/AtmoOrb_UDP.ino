@@ -17,6 +17,7 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 #define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
 #define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
+unsigned int commandOptions;
 
 // SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -28,7 +29,6 @@ byte prevColor[3];
 byte currentColor[3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis;
-unsigned int forceOff;
 
 // WHITE ADJUSTMENT
 #define RED_CORRECTION 255
@@ -60,7 +60,7 @@ void loop(){
         if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
             
             //unsigned int pixels = buffer[i++];
-            forceOff = buffer[i++];
+            commandOptions = buffer[i++];
             byte red =  buffer[i++];
             byte green =  buffer[i++];
             byte blue =  buffer[i++];
@@ -71,7 +71,7 @@ void loop(){
         //Serial.println("Got malformed packet");
     }
     
-    if(forceOff > 0)
+    if(commandOptions == 1)
     {
         forceLedsOFF();
     }
