@@ -6,6 +6,9 @@
 UDP client;
 IPAddress multicastIP(239, 15, 18, 2);
 
+// ORB ID
+unsigned int orbID = 1;
+
 // LED SETTINGS
 #define PIXEL_PIN D6
 #define PIXEL_COUNT 24
@@ -16,7 +19,6 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 #define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
 #define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
-unsigned int commandOptions;
 
 // SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -44,11 +46,10 @@ void setup()
     
     // Init leds
     strip.begin();
-    strip.show(); // Initialize all pixels to 'off'
+    strip.show();
 }
 
 void loop(){
-    
     int packetSize = client.parsePacket();
     
     if(packetSize == BUFFER_SIZE){
@@ -57,9 +58,24 @@ void loop(){
         
         // Look for 0xC0FFEE
         if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
+		
+            byte commandOptions = buffer[i++];
+            byte rcvOrbID = buffer[i++];
             
-            //unsigned int pixels = buffer[i++];
-            commandOptions = buffer[i++];
+            // Command option: 1 = force off | 2 = validate command by Orb ID
+            if(commandOptions == 1)
+            {
+                forceLedsOFF();
+                return;
+            }
+            else if(commandOptions == 2)
+            {
+                if(rcvOrbID != orbID)
+                {
+                    return;
+                }
+            }
+            
             byte red =  buffer[i++];
             byte green =  buffer[i++];
             byte blue =  buffer[i++];
@@ -69,12 +85,7 @@ void loop(){
     }else if(packetSize > 0){
         // Got malformed packet
     }
-    
-    if(commandOptions == 1)
-    {
-        forceLedsOFF();
-    }
-    else if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+    if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
     {
         smoothColor();
     }

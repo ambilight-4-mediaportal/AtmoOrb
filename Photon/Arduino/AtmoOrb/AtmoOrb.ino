@@ -1,22 +1,19 @@
 // This #include statement was automatically added by the Particle IDE.
-//#include "MDNS/MDNS.h"
-
-// This #include statement was automatically added by the Particle IDE.
 #include "neopixel/neopixel.h"
 
 // TCP server
 #define serverPort 49692
+#define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
+uint8_t buffer[BUFFER_SIZE];
 
 TCPServer server = TCPServer(serverPort);
 TCPClient client;
 
+// ORB ID
+unsigned int orbID = 1;
+
 // CLOUD status
 bool cloudEnabled = true;
-
-// mDNS
-//MDNS mdns;
-//bool MDNSactive;
-//char* hostname = "ORB001";
 
 // LEDS
 #define PIXEL_PIN D6
@@ -24,12 +21,7 @@ bool cloudEnabled = true;
 #define PIXEL_TYPE WS2812B
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
-// TCP buffers
-#define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
-uint8_t buffer[BUFFER_SIZE];
-unsigned int commandOptions;
-
-// Smoothing
+// SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
 #define SMOOTH_DELAY 4 // Delay between smoothing steps
 #define SMOOTH_BLOCK 0 // Block incoming colors while smoothing
@@ -40,8 +32,7 @@ byte currentColor[3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis;
 
-// White adjustment
-
+// WHITE ADJUSTMENT
 #define RED_CORRECTION 255
 #define GREEN_CORRECTION 255
 #define BLUE_CORRECTION 255
@@ -54,36 +45,6 @@ void setup()
   // Init leds
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
-
-  /*
-  bool success = mdns.setHostname(hostname);
-    
-  if (success) {
-    success = mdns.setService("tcp", "light", serverPort, hostname);
-  }
-    
-  if (success) {
-    success = mdns.addTXTEntry("orbID", "1");
-  }
-    
-  if (success) {
-    success = mdns.begin();
-    MDNSactive = true;
-  }
-  */
-
-  // Make sure your Serial Terminal app is closed before powering your device
-  /*
-  
-  // Now open your Serial Terminal, and hit any key to continue!
-  //while(!Serial.available()) SPARK_WLAN_Loop();
-  
-  Serial.begin(115200);
-  Serial.println(WiFi.localIP());
-  Serial.println(WiFi.subnetMask());
-  Serial.println(WiFi.gatewayIP());
-  Serial.println(WiFi.SSID());
-  */
 }
 
 void loop()
@@ -106,9 +67,24 @@ void loop()
           
           // Look for 0xC0FFEE
           if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
-              
-            //unsigned int pixels = buffer[i++];
-            commandOptions = buffer[i++];
+		  
+            byte commandOptions = buffer[i++];
+            byte rcvOrbID = buffer[i++];
+            
+            // Command option: 1 = force off | 2 = validate command by Orb ID
+            if(commandOptions == 1)
+            {
+                forceLedsOFF();
+                return;
+            }
+            else if(commandOptions == 2)
+            {
+                if(rcvOrbID != orbID)
+                {
+                    return;
+                }
+            }
+            
             byte red =  buffer[i++];
             byte green =  buffer[i++];
             byte blue =  buffer[i++];
@@ -117,11 +93,7 @@ void loop()
         }
       }
       
-      if(commandOptions == 1)
-      {
-          forceLedsOFF();
-      }
-      else if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+      if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
       {
           smoothColor();
       }
@@ -134,17 +106,9 @@ void loop()
           Spark.connect();
           cloudEnabled = true;
       }
-      
-      isClientAvailable();
+	  
       // if no client is yet connected, check for a new connection
-      
-      
-      // Update mDNS record if it has started successfully
-      /*
-      if(MDNSactive)
-      { 
-          mdns.processQueries();
-      }*/
+      isClientAvailable();   
     }
 }
 
