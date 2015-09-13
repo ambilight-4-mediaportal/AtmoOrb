@@ -100,7 +100,7 @@ void loop(){
     }
 }
 
-// Set color manually
+// Set color
 void setColor(byte red, byte green, byte blue)
 {
     for (byte i = 0; i < PIXEL_COUNT; i++)
@@ -146,9 +146,7 @@ void smoothColor()
     currentColor[1] = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
     currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
     
-    int i = 0;
-    setColor(currentColor[i++], currentColor[i++], currentColor[i++]);
-    strip.show();
+    setColor(currentColor[0], currentColor[1], currentColor[2]);
 }
 
 // Force all leds OFF

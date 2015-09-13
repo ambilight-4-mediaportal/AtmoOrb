@@ -126,71 +126,67 @@ void isClientAvailable()
     // Check if client is connected
     client = server.available();
 }
-// Set color manually
+
+// Set color
 void setColor(byte red, byte green, byte blue)
 {
-  for (byte i = 0; i < PIXEL_COUNT; i++)
-  {
-    strip.setPixelColor(i, red, green, blue);
-  }
-  
-  strip.show();
+    for (byte i = 0; i < PIXEL_COUNT; i++)
+    {
+        strip.setPixelColor(i, red, green, blue);
+    }
+    
+    strip.show();
 }
 
 // Set a new color to smooth to
 void setSmoothColor(byte red, byte green, byte blue)
 {
-  if (smoothStep == SMOOTH_STEPS || SMOOTH_BLOCK == 0)
-  {
-    red = (red * RED_CORRECTION) / 255;
-    green = (green * GREEN_CORRECTION) / 255;
-    blue = (blue * BLUE_CORRECTION) / 255;
-    
-    if (nextColor[0] == red && nextColor[1] == green && nextColor[2] == blue)
+    if (smoothStep == SMOOTH_STEPS || SMOOTH_BLOCK == 0)
     {
-      return;
+        red = (red * RED_CORRECTION) / 255;
+        green = (green * GREEN_CORRECTION) / 255;
+        blue = (blue * BLUE_CORRECTION) / 255;
+        
+        if (nextColor[0] == red && nextColor[1] == green && nextColor[2] == blue)
+        {
+          return;
+        }
+        
+        prevColor[0] = currentColor[0];
+        prevColor[1] = currentColor[1];
+        prevColor[2] = currentColor[2];
+        
+        nextColor[0] = red;
+        nextColor[1] = green;
+        nextColor[2] = blue;
+        
+        smoothMillis = millis();
+        smoothStep = 0;
     }
-    
-    prevColor[0] = currentColor[0];
-    prevColor[1] = currentColor[1];
-    prevColor[2] = currentColor[2];
-    
-    nextColor[0] = red;
-    nextColor[1] = green;
-    nextColor[2] = blue;
-    
-    smoothMillis = millis();
-    smoothStep = 0;
-  }
 }
 
 // Display one step to the next color
 void smoothColor()
 {
-  smoothStep++;
-  currentColor[0] = prevColor[0] + (((nextColor[0] - prevColor[0]) * smoothStep) / SMOOTH_STEPS);
-  currentColor[1] = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
-  currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
-  
-  for (byte i = 0; i < PIXEL_COUNT; i++)
-  {
-      strip.setPixelColor(i, currentColor[0], currentColor[1], currentColor[2]);
-  }
-  
-  strip.show();
+    smoothStep++;
+    currentColor[0] = prevColor[0] + (((nextColor[0] - prevColor[0]) * smoothStep) / SMOOTH_STEPS);
+    currentColor[1] = prevColor[1] + (((nextColor[1] - prevColor[1]) * smoothStep) / SMOOTH_STEPS);
+    currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
+    
+    setColor(currentColor[0], currentColor[1], currentColor[2]);
 }
 
 // Force all leds OFF
 void forceLedsOFF()
 {
-  setColor(0,0,0);
-  clearSmoothColors();
+    setColor(0,0,0);
+    clearSmoothColors();
 }
 
 // Clear smooth color byte arrays
 void clearSmoothColors()
 {
-  memset(prevColor, 0, sizeof(prevColor));
-  memset(currentColor, 0, sizeof(nextColor));
-  memset(nextColor, 0, sizeof(nextColor));
+    memset(prevColor, 0, sizeof(prevColor));
+    memset(currentColor, 0, sizeof(nextColor));
+    memset(nextColor, 0, sizeof(nextColor));
 }
