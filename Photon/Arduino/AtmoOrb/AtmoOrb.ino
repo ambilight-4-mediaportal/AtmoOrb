@@ -74,7 +74,16 @@ void loop()
             // Command option: 1 = force off | 2 = validate command by Orb ID
             if(commandOptions == 1)
             {
-                forceLedsOFF();
+                // Orb ID 0 = turn off all lights
+                // Otherwise turn off selectively
+                if(rcvOrbID == 0)
+                {
+                    forceLedsOFF();
+                }
+                else if(rcvOrbID == orbID)
+                {
+                    forceLedsOFF();
+                }
                 return;
             }
             else if(commandOptions == 2)
