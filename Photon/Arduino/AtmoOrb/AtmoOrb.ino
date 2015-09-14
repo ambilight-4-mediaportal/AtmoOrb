@@ -1,25 +1,26 @@
 // This #include statement was automatically added by the Particle IDE.
 #include "neopixel/neopixel.h"
 
-// TCP server
+// TCP SETTINGS
 #define serverPort 49692
-#define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
-uint8_t buffer[BUFFER_SIZE];
-
 TCPServer server = TCPServer(serverPort);
 TCPClient client;
-
-// ORB ID
-unsigned int orbID = 1;
 
 // CLOUD status
 bool cloudEnabled = true;
 
-// LEDS
+// LED SETTINGS
 #define PIXEL_PIN D6
 #define PIXEL_COUNT 24
 #define PIXEL_TYPE WS2812B
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+
+// TCP BUFFERS
+#define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
+uint8_t buffer[BUFFER_SIZE];
+
+// ORB ID
+unsigned int orbID = 1;
 
 // SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -39,12 +40,12 @@ unsigned long smoothMillis;
 
 void setup()
 {
-  // start listening for clients
+  // Init tcp
   server.begin();
   
   // Init leds
   strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
+  strip.show();
 }
 
 void loop()
