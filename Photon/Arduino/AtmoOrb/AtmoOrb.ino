@@ -16,7 +16,7 @@ bool cloudEnabled = true;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 // TCP BUFFERS
-#define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
+#define BUFFER_SIZE  5 + 3 * PIXEL_COUNT
 uint8_t buffer[BUFFER_SIZE];
 
 // ORB ID

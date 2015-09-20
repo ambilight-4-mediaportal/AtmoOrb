@@ -16,7 +16,7 @@ unsigned int orbID = 1;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 // UDP buffers
-#define BUFFER_SIZE  3 + 3 * PIXEL_COUNT
+#define BUFFER_SIZE  5 + 3 * PIXEL_COUNT
 #define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
 
