@@ -38,13 +38,14 @@ unsigned long smoothMillis;
 
 void setup()
 {
-    // Init UDP
+    //  Client
     client.begin(SERVER_PORT);
+    client.setBuffer(BUFFER_SIZE);
     
-    // Join Orb multicast group
+    // Multicast group
     client.joinMulticast(multicastIP);
     
-    // Init leds
+    // Leds
     strip.begin();
     strip.show();
 }

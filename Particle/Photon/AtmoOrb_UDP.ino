@@ -1,13 +1,13 @@
 // This #include statement was automatically added by the Particle IDE.
 #include "neopixel/neopixel.h"
 
-// TCP SETTINGS
-#define serverPort 49692
-TCPServer server = TCPServer(serverPort);
-TCPClient client;
+// UDP SETTINGS
+#define SERVER_PORT 49692
+UDP client;
+IPAddress multicastIP(239, 15, 18, 2);
 
-// CLOUD status
-bool cloudEnabled = true;
+// ORB ID
+unsigned int orbID = 1;
 
 // LED SETTINGS
 #define PIXEL_PIN D6
@@ -15,12 +15,10 @@ bool cloudEnabled = true;
 #define PIXEL_TYPE WS2812B
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
-// TCP BUFFERS
+// UDP buffers
 #define BUFFER_SIZE  5 + 3 * PIXEL_COUNT
+#define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
-
-// ORB ID
-unsigned int orbID = 1;
 
 // SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -40,35 +38,28 @@ unsigned long smoothMillis;
 
 void setup()
 {
-  // Init tcp
-  server.begin();
-  
-  // Init leds
-  strip.begin();
-  strip.show();
+    //  Client
+    client.begin(SERVER_PORT);
+    client.setBuffer(BUFFER_SIZE);
+    
+    // Multicast group
+    client.joinMulticast(multicastIP);
+    
+    // Leds
+    strip.begin();
+    strip.show();
 }
 
-void loop()
-{
-    if (client.connected()) {
-        
-      if(cloudEnabled)
-      {
-        // Disconnect from cloud to increase performance
-        Spark.disconnect();
-        cloudEnabled = false;
-      }
-      
-      while (client.available()) {
+void loop(){
+    int packetSize = client.parsePacket();
+    
+    if(packetSize == BUFFER_SIZE){
         client.read(buffer, BUFFER_SIZE);
         unsigned int i = 0;
-
-        if(i == BUFFER_SIZE){
-          i = 0;
-          
-          // Look for 0xC0FFEE
-          if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
-		  
+        
+        // Look for 0xC0FFEE
+        if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
+		
             byte commandOptions = buffer[i++];
             byte rcvOrbID = buffer[i++];
             
@@ -99,33 +90,15 @@ void loop()
             byte green =  buffer[i++];
             byte blue =  buffer[i++];
             setSmoothColor(red, green, blue);
-          }
         }
-      }
-      
-      if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
-      {
-          smoothColor();
-      }
-    } 
-    else 
-    {
-      if(!cloudEnabled)
-      {
-          // Reconnect to cloud
-          Spark.connect();
-          cloudEnabled = true;
-      }
-	  
-      // if no client is yet connected, check for a new connection
-      isClientAvailable();   
+        
+    }else if(packetSize > 0){
+        // Got malformed packet
     }
-}
-
-void isClientAvailable()
-{
-    // Check if client is connected
-    client = server.available();
+    if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+    {
+        smoothColor();
+    }
 }
 
 // Set color
