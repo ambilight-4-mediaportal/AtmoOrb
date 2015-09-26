@@ -3,6 +3,7 @@
 
 // UDP SETTINGS
 #define SERVER_PORT 49692
+#define DISCOVERY_PORT 49692
 UDP client;
 IPAddress multicastIP(239, 15, 18, 2);
 
@@ -17,8 +18,10 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 // UDP buffers
 #define BUFFER_SIZE  5 + 3 * PIXEL_COUNT
+#define BUFFER_SIZE_DISCOVERY 5
 #define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
+uint8_t bufferDiscovery[BUFFER_SIZE_DISCOVERY];
 
 // SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -58,12 +61,12 @@ void loop(){
         unsigned int i = 0;
         
         // Look for 0xC0FFEE
-        if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
-		
+        if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE)
+        {
             byte commandOptions = buffer[i++];
             byte rcvOrbID = buffer[i++];
             
-            // Command option: 1 = force off | 2 = validate command by Orb ID
+            // Command option: 1 = force off | 2 = validate command by Orb ID | 8 = discovery
             if(commandOptions == 1)
             {
                 // Orb ID 0 = turn off all lights
@@ -85,7 +88,16 @@ void loop(){
                     return;
                 }
             }
-            
+            else if(commandOptions == 8)
+            {
+                // Respond to remote IP address with Orb ID
+                IPAddress remoteIP = client.remoteIP();
+                bufferDiscovery[0] = orbID;
+                
+                client.sendPacket(bufferDiscovery, BUFFER_SIZE_DISCOVERY, remoteIP, DISCOVERY_PORT);
+                return;
+            }
+
             byte red =  buffer[i++];
             byte green =  buffer[i++];
             byte blue =  buffer[i++];
