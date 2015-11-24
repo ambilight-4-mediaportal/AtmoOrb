@@ -7,7 +7,7 @@
 UDP client;
 IPAddress multicastIP(239, 15, 18, 2);
 
-// ORB ID
+// ORB settings
 unsigned int orbID = 1;
 
 // LED SETTINGS
@@ -73,11 +73,13 @@ void loop(){
                 // Otherwise turn off selectively
                 if(rcvOrbID == 0)
                 {
-                    forceLedsOFF();
+                    setSmoothColor(0, 0, 0);
+                    //forceLedsOFF();
                 }
                 else if(rcvOrbID == orbID)
                 {
-                    forceLedsOFF();
+                    setSmoothColor(0, 0, 0);
+                    //forceLedsOFF();
                 }
                 return;
             }
