@@ -1,5 +1,9 @@
-// This #include statement was automatically added by the Particle IDE.
-#include "neopixel/neopixel.h"
+#include "FastLED/FastLED.h"
+FASTLED_USING_NAMESPACE;
+
+#if FASTLED_VERSION < 3001000
+#error "Requires FastLED 3.1 or later; check github for latest code."
+#endif
 
 // UDP SETTINGS
 #define SERVER_PORT 49692
@@ -7,17 +11,17 @@
 UDP client;
 IPAddress multicastIP(239, 15, 18, 2);
 
-// ORB settings
+// ORB SETTINGS
 unsigned int orbID = 1;
+bool useSmoothColor  = false;
 
-// LED SETTINGS
-#define PIXEL_PIN D6
-#define PIXEL_COUNT 24
-#define PIXEL_TYPE WS2812B
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+// LED settings
+#define DATA_PIN    6
+#define NUM_LEDS    24
+CRGB leds[NUM_LEDS];
 
-// UDP buffers
-#define BUFFER_SIZE  5 + 3 * PIXEL_COUNT
+// UDP BUFFERS
+#define BUFFER_SIZE  5 + 3 * NUM_LEDS
 #define BUFFER_SIZE_DISCOVERY 5
 #define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
@@ -49,8 +53,7 @@ void setup()
     client.joinMulticast(multicastIP);
     
     // Leds
-    strip.begin();
-    strip.show();
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
 }
 
 void loop(){
@@ -66,19 +69,21 @@ void loop(){
             byte commandOptions = buffer[i++];
             byte rcvOrbID = buffer[i++];
             
-            // Command option: 1 = force off | 2 = validate command by Orb ID | 8 = discovery
+            // Command option: 1 = force off | 2 = use lamp smoothing and validate by Orb ID | 4 = validate by Orb ID | 8 = discovery
             if(commandOptions == 1)
             {
                 // Orb ID 0 = turn off all lights
                 // Otherwise turn off selectively
                 if(rcvOrbID == 0)
                 {
-                    setSmoothColor(0, 0, 0);
+                    setColor(0, 0, 0);
+                    //setSmoothColor(0, 0, 0);
                     //forceLedsOFF();
                 }
                 else if(rcvOrbID == orbID)
                 {
-                    setSmoothColor(0, 0, 0);
+                    setColor(0, 0, 0);
+                    //setSmoothColor(0, 0, 0);
                     //forceLedsOFF();
                 }
                 return;
@@ -89,6 +94,17 @@ void loop(){
                 {
                     return;
                 }
+                
+                useSmoothColor = true;
+            }
+            else if(commandOptions == 4)
+            {
+                if(rcvOrbID != orbID)
+                {
+                    return;
+                }
+                
+                useSmoothColor = false;
             }
             else if(commandOptions == 8)
             {
@@ -97,34 +113,55 @@ void loop(){
                 bufferDiscovery[0] = orbID;
                 
                 client.sendPacket(bufferDiscovery, BUFFER_SIZE_DISCOVERY, remoteIP, DISCOVERY_PORT);
+                
+                // Clear buffer
+                memset(bufferDiscovery, 0, sizeof(bufferDiscovery));
                 return;
             }
 
             byte red =  buffer[i++];
             byte green =  buffer[i++];
             byte blue =  buffer[i++];
-            setSmoothColor(red, green, blue);
+        
+            if(useSmoothColor)
+            {
+                setSmoothColor(red, green, blue);
+            }
+            else
+            {
+                // Apply color corrections
+                red = (red * RED_CORRECTION) / 255;
+                green = (green * GREEN_CORRECTION) / 255;
+                blue = (blue * BLUE_CORRECTION) / 255;
+            
+                setColor(red, green, blue);
+            }
         }
         
     }else if(packetSize > 0){
         // Got malformed packet
     }
-    if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+    
+    if (useSmoothColor)
     {
-        smoothColor();
+        if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+        { 
+            smoothColor();
+        }
     }
 }
 
 // Set color
 void setColor(byte red, byte green, byte blue)
 {
-    for (byte i = 0; i < PIXEL_COUNT; i++)
+    for (byte i = 0; i < NUM_LEDS; i++)
     {
-        strip.setPixelColor(i, red, green, blue);
+        leds[i] = CRGB(red, green, blue); 
     }
     
-    strip.show();
+    FastLED.show();
 }
+
 
 // Set a new color to smooth to
 void setSmoothColor(byte red, byte green, byte blue)
