@@ -1,26 +1,31 @@
 // This #include statement was automatically added by the Particle IDE.
-#include "neopixel/neopixel.h"
+#include "FastLED/FastLED.h"
+FASTLED_USING_NAMESPACE;
+
+#if FASTLED_VERSION < 3001000
+#error "Requires FastLED 3.1 or later; check github for latest code."
+#endif
 
 // TCP SETTINGS
 #define serverPort 49692
 TCPServer server = TCPServer(serverPort);
 TCPClient client;
 
+// ORB ID
+unsigned int orbID = 1;
+bool useSmoothColor  = false;
+
 // CLOUD status
 bool cloudEnabled = true;
 
-// LED SETTINGS
-#define PIXEL_PIN D6
-#define PIXEL_COUNT 24
-#define PIXEL_TYPE WS2812B
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+// LED settings
+#define DATA_PIN    6
+#define NUM_LEDS    24
+CRGB leds[NUM_LEDS];
 
 // TCP BUFFERS
-#define BUFFER_SIZE  5 + 3 * PIXEL_COUNT
+#define BUFFER_SIZE  5 + 3 * NUM_LEDS
 uint8_t buffer[BUFFER_SIZE];
-
-// ORB ID
-unsigned int orbID = 1;
 
 // SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -40,82 +45,106 @@ unsigned long smoothMillis;
 
 void setup()
 {
-  // Server
-  server.begin();
+    // Server
+    server.begin();
   
-  // Leds
-  strip.begin();
-  strip.show();
+    // Leds
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
 }
 
 void loop()
 {
     if (client.connected()) {
-        
-      if(cloudEnabled)
-      {
-        // Disconnect from cloud to increase performance
-        Spark.disconnect();
-        cloudEnabled = false;
-      }
-      
-      while (client.available()) {
-        client.read(buffer, BUFFER_SIZE);
-        unsigned int i = 0;
-
-        if(i == BUFFER_SIZE){
-          i = 0;
+            /*
+            if(cloudEnabled)
+            {
+                // Disconnect from cloud to increase performance
+                Spark.disconnect();
+                cloudEnabled = false;
+            }*/
           
-          // Look for 0xC0FFEE
-          if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE){
-		  
-            byte commandOptions = buffer[i++];
-            byte rcvOrbID = buffer[i++];
+            while (client.available()) {
+            client.read(buffer, BUFFER_SIZE);
+            unsigned int i = 0;
             
-            // Command option: 1 = force off | 2 = validate command by Orb ID
-            if(commandOptions == 1)
+            
+            // Look for 0xC0FFEE
+            if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE)
             {
-                // Orb ID 0 = turn off all lights
-                // Otherwise turn off selectively
-                if(rcvOrbID == 0)
+                byte commandOptions = buffer[i++];
+                byte rcvOrbID = buffer[i++];
+                
+                // Command option: 1 = force off | 2 = use lamp smoothing and validate by Orb ID | 4 = validate by Orb ID | 8 = discovery
+                if(commandOptions == 1)
                 {
-                    forceLedsOFF();
-                }
-                else if(rcvOrbID == orbID)
-                {
-                    forceLedsOFF();
-                }
-                return;
-            }
-            else if(commandOptions == 2)
-            {
-                if(rcvOrbID != orbID)
-                {
+                    // Orb ID 0 = turn off all lights
+                    // Otherwise turn off selectively
+                    if(rcvOrbID == 0)
+                    {
+                        forceLedsOFF();
+                    }
+                    else if(rcvOrbID == orbID)
+                    {
+                        forceLedsOFF();
+                    }
                     return;
                 }
-            }
+                else if(commandOptions == 2)
+                {
+                    if(rcvOrbID != orbID)
+                    {
+                        return;
+                    }
+                    
+                    useSmoothColor = true;
+                }
+                else if(commandOptions == 4)
+                {
+                    if(rcvOrbID != orbID)
+                    {
+                        return;
+                    }
+                    
+                    useSmoothColor = false;
+                }
+    
+                byte red =  buffer[i++];
+                byte green =  buffer[i++];
+                byte blue =  buffer[i++];
             
-            byte red =  buffer[i++];
-            byte green =  buffer[i++];
-            byte blue =  buffer[i++];
-            setSmoothColor(red, green, blue);
-          }
+                if(useSmoothColor)
+                {
+                    setSmoothColor(red, green, blue);
+                }
+                else
+                {
+                    // Apply color corrections
+                    red = (red * RED_CORRECTION) / 255;
+                    green = (green * GREEN_CORRECTION) / 255;
+                    blue = (blue * BLUE_CORRECTION) / 255;
+                
+                    setColor(red, green, blue);
+                }
+            }
         }
-      }
-      
-      if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
-      {
-          smoothColor();
-      }
-    } 
+        
+        if (useSmoothColor)
+        {
+            if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+            { 
+                smoothColor();
+            }
+        }
+    }
     else 
     {
+        /*
       if(!cloudEnabled)
       {
           // Reconnect to cloud
           Spark.connect();
           cloudEnabled = true;
-      }
+      }*/
 	  
       // if no client is yet connected, check for a new connection
       isClientAvailable();   
@@ -128,16 +157,18 @@ void isClientAvailable()
     client = server.available();
 }
 
+
 // Set color
 void setColor(byte red, byte green, byte blue)
 {
-    for (byte i = 0; i < PIXEL_COUNT; i++)
+    for (byte i = 0; i < NUM_LEDS; i++)
     {
-        strip.setPixelColor(i, red, green, blue);
+        leds[i] = CRGB(red, green, blue); 
     }
     
-    strip.show();
+    FastLED.show();
 }
+
 
 // Set a new color to smooth to
 void setSmoothColor(byte red, byte green, byte blue)
