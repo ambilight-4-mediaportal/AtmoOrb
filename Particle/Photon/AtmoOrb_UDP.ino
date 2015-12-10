@@ -76,15 +76,11 @@ void loop(){
                 // Otherwise turn off selectively
                 if(rcvOrbID == 0)
                 {
-                    setColor(0, 0, 0);
-                    //setSmoothColor(0, 0, 0);
-                    //forceLedsOFF();
+                    forceLedsOFF();
                 }
                 else if(rcvOrbID == orbID)
                 {
-                    setColor(0, 0, 0);
-                    //setSmoothColor(0, 0, 0);
-                    //forceLedsOFF();
+                    forceLedsOFF();
                 }
                 return;
             }
