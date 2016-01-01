@@ -1,3 +1,6 @@
+// Enabled mult-threda
+SYSTEM_THREAD(ENABLED);
+
 #include "FastLED/FastLED.h"
 FASTLED_USING_NAMESPACE;
 
@@ -45,6 +48,9 @@ unsigned long smoothMillis;
 
 void setup()
 {
+    // Wait for WiFi connection
+    waitUntil(WiFi.ready);
+    
     //  Client
     client.begin(SERVER_PORT);
     client.setBuffer(BUFFER_SIZE);
@@ -69,7 +75,11 @@ void loop(){
             byte commandOptions = buffer[i++];
             byte rcvOrbID = buffer[i++];
             
-            // Command option: 1 = force off | 2 = use lamp smoothing and validate by Orb ID | 4 = validate by Orb ID | 8 = discovery
+            // Command options
+            // 1 = force off
+            // 2 = use lamp smoothing and validate by Orb ID
+            // 4 = validate by Orb ID
+            // 8 = discovery
             if(commandOptions == 1)
             {
                 // Orb ID 0 = turn off all lights
