@@ -11,6 +11,7 @@ FASTLED_USING_NAMESPACE;
 #define SERVER_PORT 49692
 TCPServer server = TCPServer(SERVER_PORT);
 TCPClient client;
+bool connectLock = false;
 
 // ORB ID
 unsigned int orbID = 1;
@@ -47,7 +48,7 @@ unsigned long smoothMillis;
 void setup()
 {
     // WiFi
-     initWiFi();
+    initWiFi();
     
     // Server
     server.begin();
@@ -58,12 +59,19 @@ void setup()
 
 void initWiFi()
 {
-    // Wait for WiFi connection
-    waitUntil(WiFi.ready);
-    
-    //  Client
-    server.stop();
-    server.begin();
+    if(!connectLock)
+    {
+        connectLock = true;
+        
+        // Wait for WiFi connection
+        waitUntil(WiFi.ready);
+        
+        //  Client
+        server.stop();
+        server.begin();
+        
+        connectLock = false;
+    }
 }
 
 void loop()
