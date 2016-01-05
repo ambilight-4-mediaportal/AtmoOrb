@@ -1,4 +1,3 @@
-// Enabled mult-threda
 SYSTEM_THREAD(ENABLED);
 
 #include "FastLED/FastLED.h"
@@ -48,112 +47,127 @@ unsigned long smoothMillis;
 
 void setup()
 {
-    // Wait for WiFi connection
-    waitUntil(WiFi.ready);
-    
-    //  Client
-    client.begin(SERVER_PORT);
-    client.setBuffer(BUFFER_SIZE);
-    
-    // Multicast group
-    client.joinMulticast(multicastIP);
+    // WiFi
+    initWiFi();
     
     // Leds
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
 }
 
-void loop(){
-    int packetSize = client.parsePacket();
+void initWiFi()
+{
+    // Wait for WiFi connection
+    waitUntil(WiFi.ready);
     
-    if(packetSize == BUFFER_SIZE){
-        client.read(buffer, BUFFER_SIZE);
-        unsigned int i = 0;
+    //  Client
+    client.stop();
+    client.begin(SERVER_PORT);
+    client.setBuffer(BUFFER_SIZE);
+    
+    // Multicast group
+    client.joinMulticast(multicastIP);
+}
+
+void loop(){
+    if(WiFi.ready() && !WiFi.connecting())
+    {
+        int packetSize = client.parsePacket();
         
-        // Look for 0xC0FFEE
-        if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE)
-        {
-            byte commandOptions = buffer[i++];
-            byte rcvOrbID = buffer[i++];
+        if(packetSize == BUFFER_SIZE){
+            client.read(buffer, BUFFER_SIZE);
+            client.flush();
+            unsigned int i = 0;
             
+            // Look for 0xC0FFEE
+            if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE)
+            {
+                byte commandOptions = buffer[i++];
+                byte rcvOrbID = buffer[i++];
+                
             // Command options
             // 1 = force off
             // 2 = use lamp smoothing and validate by Orb ID
             // 4 = validate by Orb ID
             // 8 = discovery
             if(commandOptions == 1)
-            {
-                // Orb ID 0 = turn off all lights
-                // Otherwise turn off selectively
-                if(rcvOrbID == 0)
                 {
-                    forceLedsOFF();
-                }
-                else if(rcvOrbID == orbID)
-                {
-                    forceLedsOFF();
-                }
-                return;
-            }
-            else if(commandOptions == 2)
-            {
-                if(rcvOrbID != orbID)
-                {
+                    // Orb ID 0 = turn off all lights
+                    // Otherwise turn off selectively
+                    if(rcvOrbID == 0)
+                    {
+                        forceLedsOFF();
+                    }
+                    else if(rcvOrbID == orbID)
+                    {
+                        forceLedsOFF();
+                    }
                     return;
                 }
-                
-                useSmoothColor = true;
-            }
-            else if(commandOptions == 4)
-            {
-                if(rcvOrbID != orbID)
+                else if(commandOptions == 2)
                 {
+                    if(rcvOrbID != orbID)
+                    {
+                        return;
+                    }
+                    
+                    useSmoothColor = true;
+                }
+                else if(commandOptions == 4)
+                {
+                    if(rcvOrbID != orbID)
+                    {
+                        return;
+                    }
+                    
+                    useSmoothColor = false;
+                }
+                else if(commandOptions == 8)
+                {
+                    // Respond to remote IP address with Orb ID
+                    IPAddress remoteIP = client.remoteIP();
+                    bufferDiscovery[0] = orbID;
+                    
+                    client.sendPacket(bufferDiscovery, BUFFER_SIZE_DISCOVERY, remoteIP, DISCOVERY_PORT);
+                    
+                    // Clear buffer
+                    memset(bufferDiscovery, 0, sizeof(bufferDiscovery));
                     return;
                 }
-                
-                useSmoothColor = false;
-            }
-            else if(commandOptions == 8)
-            {
-                // Respond to remote IP address with Orb ID
-                IPAddress remoteIP = client.remoteIP();
-                bufferDiscovery[0] = orbID;
-                
-                client.sendPacket(bufferDiscovery, BUFFER_SIZE_DISCOVERY, remoteIP, DISCOVERY_PORT);
-                
-                // Clear buffer
-                memset(bufferDiscovery, 0, sizeof(bufferDiscovery));
-                return;
-            }
-
-            byte red =  buffer[i++];
-            byte green =  buffer[i++];
-            byte blue =  buffer[i++];
-        
-            if(useSmoothColor)
-            {
-                setSmoothColor(red, green, blue);
-            }
-            else
-            {
-                // Apply color corrections
-                red = (red * RED_CORRECTION) / 255;
-                green = (green * GREEN_CORRECTION) / 255;
-                blue = (blue * BLUE_CORRECTION) / 255;
-            
-                setColor(red, green, blue);
-            }
-        }
-        
-    }else if(packetSize > 0){
-        // Got malformed packet
-    }
     
-    if (useSmoothColor)
-    {
-        if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
-        { 
-            smoothColor();
+                byte red =  buffer[i++];
+                byte green =  buffer[i++];
+                byte blue =  buffer[i++];
+            
+                if(useSmoothColor)
+                {
+                    setSmoothColor(red, green, blue);
+                }
+                else
+                {
+                    // Apply color corrections
+                    red = (red * RED_CORRECTION) / 255;
+                    green = (green * GREEN_CORRECTION) / 255;
+                    blue = (blue * BLUE_CORRECTION) / 255;
+                
+                    setColor(red, green, blue);
+                }
+            }
+            
+        }else if(packetSize > 0){
+            // Got malformed packet
         }
+        
+        if (useSmoothColor)
+        {
+            if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+            { 
+                smoothColor();
+            }
+        }
+    }
+    else
+    {
+        initWiFi();
     }
 }
 
