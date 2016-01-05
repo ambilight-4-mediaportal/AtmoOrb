@@ -12,6 +12,8 @@ FASTLED_USING_NAMESPACE;
 #define DISCOVERY_PORT 49692
 UDP client;
 IPAddress multicastIP(239, 15, 18, 2);
+bool connectLock  = false;
+
 
 // ORB SETTINGS
 unsigned int orbID = 1;
@@ -49,23 +51,30 @@ void setup()
 {
     // WiFi
     initWiFi();
-    
+        
     // Leds
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
 }
 
 void initWiFi()
 {
-    // Wait for WiFi connection
-    waitUntil(WiFi.ready);
-    
-    //  Client
-    client.stop();
-    client.begin(SERVER_PORT);
-    client.setBuffer(BUFFER_SIZE);
-    
-    // Multicast group
-    client.joinMulticast(multicastIP);
+    if(!connectLock)
+    {
+        connectLock = true;
+        
+        // Wait for WiFi connection
+        waitUntil(WiFi.ready);
+        
+        //  Client
+        client.stop();
+        client.begin(SERVER_PORT);
+        client.setBuffer(BUFFER_SIZE);
+        
+        // Multicast group
+        client.joinMulticast(multicastIP);
+        
+        connectLock = false;
+    }
 }
 
 void loop(){
