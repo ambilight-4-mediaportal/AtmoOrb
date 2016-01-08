@@ -84,7 +84,6 @@ void loop(){
         
         if(packetSize == BUFFER_SIZE){
             client.read(buffer, BUFFER_SIZE);
-            client.flush();
             unsigned int i = 0;
             
             // Look for 0xC0FFEE
