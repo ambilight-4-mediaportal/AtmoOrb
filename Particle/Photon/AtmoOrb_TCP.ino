@@ -54,7 +54,7 @@ void setup()
     server.begin();
   
     // Leds
-    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
 }
 
 void initWiFi()
