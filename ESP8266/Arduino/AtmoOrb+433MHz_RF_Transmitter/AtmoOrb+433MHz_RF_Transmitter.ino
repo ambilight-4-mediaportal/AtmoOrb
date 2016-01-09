@@ -22,16 +22,16 @@
 // 15             WS2812B Data
 //
 //
-// We are using a baud rate of 115200 here.
+// We are using a baud rate of 19200 here.
 // You can either change the ESP8266 baudrate with "AT+CIOBAUD=..."
-// or change the program to use another one by editing "Serial1.begin(115200);"
+// or change the program to use another one by editing "Serial1.begin(19200);"
 
 #include "FastLED.h"
 #include <RCSwitch.h>
 
 #define NUM_LEDS 27 // Number of leds
 #define DATA_PIN 15 // Data pin for leds
-#define SLEEP_DELAY 900000 // Delay until RF transmitter send signals
+#define SLEEP_DELAY 900000 // Delay until RF transmitter sends signals
 
 #define ID "1" // Id of this lamp (can be string or integer)
 
@@ -49,9 +49,9 @@
 #define SMOOTH_BLOCK 0 // Block incoming colors while smoothing
 
 // Startup color
-#define STARTUP_RED 0
-#define STARTUP_GREEN 0
-#define STARTUP_BLUE 200
+#define STARTUP_RED 255
+#define STARTUP_GREEN 175
+#define STARTUP_BLUE 100
 
 // White adjustment
 #define RED_CORRECTION 220
@@ -61,7 +61,6 @@
 
 CRGB leds[NUM_LEDS];
 RCSwitch mySwitch = RCSwitch();
-
 char serialBuffer[500];
 String ip;
 boolean initialStart = false;
@@ -82,11 +81,16 @@ void setup()
   TXLED1;
 
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
-  mySwitch.enableTransmit(8);
+  //FastLED.setCorrection(TypicalSMD5050);
+  FastLED.setCorrection(CRGB(RED_CORRECTION, GREEN_CORRECTION, BLUE_CORRECTION));
 
+  setSmoothColor(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE);
+  
+  mySwitch.enableTransmit(8);
+  
   Serial.begin(115200);
   Serial.setTimeout(5);
-  Serial1.begin(115200);
+  Serial1.begin(19200);
   Serial1.setTimeout(5000); 
 
   // Reset ESP8266
@@ -247,9 +251,6 @@ void setSmoothColor(byte red, byte green, byte blue)
 {
   if (smoothStep == SMOOTH_STEPS || SMOOTH_BLOCK == 0)
   {
-    red = (red * RED_CORRECTION) / 255;
-    green = (green * GREEN_CORRECTION) / 255;
-    blue = (blue * BLUE_CORRECTION) / 255;
     if (nextColor[0] == red && nextColor[1] == green && nextColor[2] == blue)
     {
       return;
@@ -310,7 +311,6 @@ void ipReceived()
   if (!initialStart)
   {
     initialStart = true;
-    setSmoothColor(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE);
   }
 }
 
