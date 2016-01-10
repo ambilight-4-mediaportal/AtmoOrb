@@ -42,7 +42,7 @@ byte currentColor[3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis;
 
-// WHITE ADJUSTMENT
+// CUSTOM COLOR CORRECTIONS
 #define RED_CORRECTION 255
 #define GREEN_CORRECTION 255
 #define BLUE_CORRECTION 255
@@ -52,8 +52,13 @@ void setup()
     // WiFi
     initWiFi();
         
-    // Leds
-    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
+    // Leds - choose one correction method
+    
+    // 1 - FastLED predefined color correction
+    //FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
+    
+    // 2 - Custom color correction
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(CRGB(RED_CORRECTION, GREEN_CORRECTION, BLUE_CORRECTION));
 }
 
 void initWiFi()
