@@ -50,6 +50,7 @@ unsigned long smoothMillis;
 void setup()
 {
     // WiFi
+    lastWiFiCheck = millis();
     initWiFi();
     
     // Server
@@ -77,7 +78,6 @@ void initWiFi()
         server.stop();
         server.begin();
         
-        lastWiFiCheck = millis();
         connectLock = false;
     }
 }
@@ -88,6 +88,7 @@ void loop()
     currentTime = millis();
     if(currentTime - lastWiFiCheck > 60000)
     {
+        lastWiFiCheck = millis();
         if(!WiFi.ready())
         {
             initWiFi();

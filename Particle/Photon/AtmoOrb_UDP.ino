@@ -51,6 +51,7 @@ unsigned long smoothMillis;
 void setup()
 {
     // WiFi
+    lastWiFiCheck = millis();
     initWiFi();
         
     // Leds - choose one correction method
@@ -79,7 +80,6 @@ void initWiFi()
         // Multicast group
         client.joinMulticast(multicastIP);
         
-        lastWiFiCheck = millis();
         connectLock = false;
     }
 }
@@ -89,6 +89,7 @@ void loop(){
     currentTime = millis();
     if(currentTime - lastWiFiCheck > 60000)
     {
+        lastWiFiCheck = millis();
         if(!WiFi.ready())
         {
             initWiFi();
@@ -170,11 +171,6 @@ void loop(){
             }
             else
             {
-                // Apply color corrections
-                red = (red * RED_CORRECTION) / 255;
-                green = (green * GREEN_CORRECTION) / 255;
-                blue = (blue * BLUE_CORRECTION) / 255;
-            
                 setColor(red, green, blue);
             }
         }
