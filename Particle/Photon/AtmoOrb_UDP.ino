@@ -14,7 +14,6 @@ UDP client;
 IPAddress multicastIP(239, 15, 18, 2);
 bool connectLock  = false;
 
-
 // ORB SETTINGS
 unsigned int orbID = 1;
 bool useSmoothColor  = false;
@@ -30,6 +29,8 @@ CRGB leds[NUM_LEDS];
 #define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
 uint8_t bufferDiscovery[BUFFER_SIZE_DISCOVERY];
+unsigned long currentTime;
+unsigned long lastWiFiCheck;
 
 // SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -73,19 +74,25 @@ void initWiFi()
         //  Client
         client.stop();
         client.begin(SERVER_PORT);
-        client.setBuffer(BUFFER_SIZE);
+        //client.setBuffer(BUFFER_SIZE);
         
         // Multicast group
         client.joinMulticast(multicastIP);
         
+        lastWiFiCheck = millis();
         connectLock = false;
     }
 }
 
 void loop(){
-    if(!WiFi.ready())
+    // Check WiFi connection every minute
+    currentTime = millis();
+    if(currentTime - lastWiFiCheck > 60000)
     {
-        initWiFi();
+        if(!WiFi.ready())
+        {
+            initWiFi();
+        }
     }
     
     int packetSize = client.parsePacket();
@@ -112,12 +119,12 @@ void loop(){
                 // Otherwise turn off selectively
                 if(rcvOrbID == 0)
                 {
-					setSmoothColor(0, 0, 0);
+                    setSmoothColor(0, 0, 0);
                     //forceLedsOFF();
                 }
                 else if(rcvOrbID == orbID)
                 {
-					setSmoothColor(0, 0, 0);
+                    setSmoothColor(0, 0, 0);
                     //forceLedsOFF();
                 }
                 //return;
@@ -202,10 +209,6 @@ void setSmoothColor(byte red, byte green, byte blue)
 {
     if (smoothStep == SMOOTH_STEPS || SMOOTH_BLOCK == 0)
     {
-        red = (red * RED_CORRECTION) / 255;
-        green = (green * GREEN_CORRECTION) / 255;
-        blue = (blue * BLUE_CORRECTION) / 255;
-        
         if (nextColor[0] == red && nextColor[1] == green && nextColor[2] == blue)
         {
           return;

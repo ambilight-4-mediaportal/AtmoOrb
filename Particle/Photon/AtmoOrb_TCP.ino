@@ -12,6 +12,8 @@ FASTLED_USING_NAMESPACE;
 TCPServer server = TCPServer(SERVER_PORT);
 TCPClient client;
 bool connectLock = false;
+unsigned long currentTime;
+unsigned long lastWiFiCheck;
 
 // ORB ID
 unsigned int orbID = 1;
@@ -75,118 +77,122 @@ void initWiFi()
         server.stop();
         server.begin();
         
+        lastWiFiCheck = millis();
         connectLock = false;
     }
 }
 
 void loop()
 {
-    if(!WiFi.ready())
+    // Check WiFi connection every minute
+    currentTime = millis();
+    if(currentTime - lastWiFiCheck > 60000)
     {
-        initWiFi();
+        if(!WiFi.ready())
+        {
+            initWiFi();
+        }
     }
-	
-	if (client.connected()) {
-			/*
-			if(cloudEnabled)
-			{
-				// Disconnect from cloud to increase performance
-				Spark.disconnect();
-				cloudEnabled = false;
-			}*/
-		  
-			while (client.available()) {
-			client.read(buffer, BUFFER_SIZE);
-			unsigned int i = 0;
-			
-			
-			// Look for 0xC0FFEE
-			if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE)
-			{
-				byte commandOptions = buffer[i++];
-				byte rcvOrbID = buffer[i++];
-			  
-		// Command options
-		// 1 = force off
-		// 2 = use lamp smoothing and validate by Orb ID
-		// 4 = validate by Orb ID
-		// 8 = discovery
-				if(commandOptions == 1)
-				{
-					// Orb ID 0 = turn off all lights
-					// Otherwise turn off selectively
-					if(rcvOrbID == 0)
-					{
-						setSmoothColor(0, 0, 0);
-						//forceLedsOFF();
-					}
-					else if(rcvOrbID == orbID)
-					{
-						setSmoothColor(0, 0, 0);
-						//forceLedsOFF();
-					}
-					//return;
-				}
-				else if(commandOptions == 2)
-				{
-					if(rcvOrbID != orbID)
-					{
-						return;
-					}
-					
-					useSmoothColor = true;
-				}
-				else if(commandOptions == 4)
-				{
-					if(rcvOrbID != orbID)
-					{
-						return;
-					}
-					
-					useSmoothColor = false;
-				}
-	
-				byte red =  buffer[i++];
-				byte green =  buffer[i++];
-				byte blue =  buffer[i++];
-			
-				if(useSmoothColor)
-				{
-					setSmoothColor(red, green, blue);
-				}
-				else
-				{
-					// Apply color corrections
-					red = (red * RED_CORRECTION) / 255;
-					green = (green * GREEN_CORRECTION) / 255;
-					blue = (blue * BLUE_CORRECTION) / 255;
-				
-					setColor(red, green, blue);
-				}
-			}
-		}
-		
-		if (useSmoothColor)
-		{
-			if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
-			{ 
-				smoothColor();
-			}
-		}
-	}
-	else 
-	{
-		/*
-	  if(!cloudEnabled)
-	  {
-		  // Reconnect to cloud
-		  Spark.connect();
-		  cloudEnabled = true;
-	  }*/
+
+    if (client.connected()) {
+        /*
+        if(cloudEnabled)
+        {
+            // Disconnect from cloud to increase performance
+            Spark.disconnect();
+            cloudEnabled = false;
+        }*/
+      
+        while (client.available()) {
+            client.read(buffer, BUFFER_SIZE);
+            unsigned int i = 0;
+            
+            // Look for 0xC0FFEE
+            if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE)
+            {
+                byte commandOptions = buffer[i++];
+                byte rcvOrbID = buffer[i++];
+              
+        		// Command options
+        		// 1 = force off
+        		// 2 = use lamp smoothing and validate by Orb ID
+        		// 4 = validate by Orb ID
+        		// 8 = discovery
+                if(commandOptions == 1)
+                {
+                    // Orb ID 0 = turn off all lights
+                    // Otherwise turn off selectively
+                    if(rcvOrbID == 0)
+                    {
+                        forceLedsOFF();
+                    }
+                    else if(rcvOrbID == orbID)
+                    {
+                        forceLedsOFF();
+                    }
+                    return;
+                }
+                else if(commandOptions == 2)
+                {
+                    if(rcvOrbID != orbID)
+                    {
+                        return;
+                    }
+                    
+                    useSmoothColor = true;
+                }
+                else if(commandOptions == 4)
+                {
+                    if(rcvOrbID != orbID)
+                    {
+                        return;
+                    }
+                    
+                    useSmoothColor = false;
+                }
+    
+                byte red =  buffer[i++];
+                byte green =  buffer[i++];
+                byte blue =  buffer[i++];
+            
+                if(useSmoothColor)
+                {
+                    setSmoothColor(red, green, blue);
+                }
+                else
+                {
+                    // Apply color corrections
+                    red = (red * RED_CORRECTION) / 255;
+                    green = (green * GREEN_CORRECTION) / 255;
+                    blue = (blue * BLUE_CORRECTION) / 255;
+                
+                    setColor(red, green, blue);
+                }
+            }
+        }
+        
+        if (useSmoothColor)
+        {
+            if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+            { 
+                smoothColor();
+            }
+        }
+    }
+    else 
+    {
+      /*
+      if(!cloudEnabled)
+      {
+          // Reconnect to cloud
+          Spark.connect();
+          cloudEnabled = true;
+      }
+      */
 	  
-	  // if no client is yet connected, check for a new connection
-	  isClientAvailable();   
-	}
+      // if no client is yet connected, check for a new connection
+      isClientAvailable();   
+    }
 }
 
 void isClientAvailable()
