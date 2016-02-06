@@ -40,6 +40,7 @@ byte prevColor[3];
 byte currentColor[3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis;
+bool setToBlack = false;
 
 // CUSTOM COLOR CORRECTIONS
 #define RED_CORRECTION 255
@@ -116,17 +117,18 @@ void loop()
         		// 1 = force off
         		// 2 = use lamp smoothing and validate by Orb ID
         		// 4 = validate by Orb ID
-        		// 8 = discovery
                 if(commandOptions == 1)
                 {
                     // Orb ID 0 = turn off all lights
                     // Otherwise turn off selectively
                     if(rcvOrbID == 0)
                     {
+                        setToBlack = true;
                         forceLedsOFF();
                     }
                     else if(rcvOrbID == orbID)
                     {
+                        setToBlack = true;
                         forceLedsOFF();
                     }
                     return;
@@ -154,18 +156,25 @@ void loop()
                 byte green =  buffer[i++];
                 byte blue =  buffer[i++];
             
-                if(useSmoothColor)
+                if(setToBlack && commandOptions != 1)
                 {
+                    setColor(red, green, blue);
                     setSmoothColor(red, green, blue);
+                    
+                    setToBlack = false;
+                    return;
                 }
                 else
                 {
-                    // Apply color corrections
-                    red = (red * RED_CORRECTION) / 255;
-                    green = (green * GREEN_CORRECTION) / 255;
-                    blue = (blue * BLUE_CORRECTION) / 255;
-                
-                    setColor(red, green, blue);
+                    if(useSmoothColor)
+                    {
+                        setSmoothColor(red, green, blue);
+                    }
+                    else
+                    {
+                        setColor(red, green, blue);
+                        return;
+                    }
                 }
             }
         }
