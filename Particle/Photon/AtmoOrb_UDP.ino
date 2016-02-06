@@ -50,6 +50,7 @@ unsigned long smoothMillis;
 void setup()
 {
     // WiFi
+    lastWiFiCheck = millis();
     initWiFi();
         
     // Leds - choose one correction method
@@ -84,10 +85,10 @@ void initWiFi()
 
 void loop(){
     // Check WiFi connection every minute
-    if(millis() - lastWiFiCheck > 60000)
+    if(millis() - lastWiFiCheck > 500)
     {
         lastWiFiCheck = millis();
-        if(!WiFi.ready())
+        if(!WiFi.ready() || !WiFi.connecting())
         {
             initWiFi();
         }

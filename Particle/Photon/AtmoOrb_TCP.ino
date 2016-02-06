@@ -49,6 +49,7 @@ unsigned long smoothMillis;
 void setup()
 {
     // WiFi
+    lastWiFiCheck = millis();
     initWiFi();
     
     // Server
@@ -83,9 +84,10 @@ void initWiFi()
 void loop()
 {
     // Check WiFi connection every minute
-    if(millis() - lastWiFiCheck > 60000)
+    if(millis() - lastWiFiCheck > 500)
     {
-        lastWiFiCheck = millis();        if(!WiFi.ready())
+        lastWiFiCheck = millis();
+        if(!WiFi.ready() || !WiFi.connecting())
         {
             initWiFi();
         }
