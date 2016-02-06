@@ -12,8 +12,7 @@ FASTLED_USING_NAMESPACE;
 TCPServer server = TCPServer(SERVER_PORT);
 TCPClient client;
 bool connectLock = false;
-unsigned long currentTime;
-unsigned long lastWiFiCheck;
+unsigned long lastWiFiCheck = 0;
 
 // ORB ID
 unsigned int orbID = 1;
@@ -50,7 +49,6 @@ unsigned long smoothMillis;
 void setup()
 {
     // WiFi
-    lastWiFiCheck = millis();
     initWiFi();
     
     // Server
@@ -85,11 +83,9 @@ void initWiFi()
 void loop()
 {
     // Check WiFi connection every minute
-    currentTime = millis();
-    if(currentTime - lastWiFiCheck > 60000)
+    if(millis() - lastWiFiCheck > 60000)
     {
-        lastWiFiCheck = millis();
-        if(!WiFi.ready())
+        lastWiFiCheck = millis();        if(!WiFi.ready())
         {
             initWiFi();
         }

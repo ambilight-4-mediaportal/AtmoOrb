@@ -29,8 +29,7 @@ CRGB leds[NUM_LEDS];
 #define TIMEOUT_MS   500
 uint8_t buffer[BUFFER_SIZE];
 uint8_t bufferDiscovery[BUFFER_SIZE_DISCOVERY];
-unsigned long currentTime;
-unsigned long lastWiFiCheck;
+unsigned long lastWiFiCheck = 0;
 
 // SMOOTHING SETTINGS
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
@@ -51,7 +50,6 @@ unsigned long smoothMillis;
 void setup()
 {
     // WiFi
-    lastWiFiCheck = millis();
     initWiFi();
         
     // Leds - choose one correction method
@@ -86,8 +84,7 @@ void initWiFi()
 
 void loop(){
     // Check WiFi connection every minute
-    currentTime = millis();
-    if(currentTime - lastWiFiCheck > 60000)
+    if(millis() - lastWiFiCheck > 60000)
     {
         lastWiFiCheck = millis();
         if(!WiFi.ready())
