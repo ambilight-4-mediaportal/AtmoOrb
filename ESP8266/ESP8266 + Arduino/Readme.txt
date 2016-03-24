@@ -1,0 +1,2 @@
+This AtmoOrb version is using an Arduino for the processing and an ESP8266 for WiFi. They communicate via UART (serial) with each other and the EPS8266 AT commands are utilized.
+This is an outdated approach and is only kept for legacy support.
