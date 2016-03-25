@@ -68,7 +68,8 @@ void setup()
     leds[x] = CRGB(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE);
   }
   FastLED.show();
-  #if RC_Switch == 1
+  
+  #if RC_SWITCH == 1
     mySwitch.enableTransmit(8);
   #endif
 
