@@ -9,3 +9,6 @@
 [submodule "Libraries/Adafruit_CC3000_Library"]
 	path = Libraries/Adafruit_CC3000_Library
 	url = https://github.com/RickDB/Adafruit_CC3000_Library.git
+[submodule "Libraries/RC-Switch"]
+	path = Libraries/RC-Switch
+	url = https://github.com/sui77/rc-switch.git
