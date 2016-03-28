@@ -12,3 +12,6 @@
 [submodule "Libraries/RC-Switch"]
 	path = Libraries/RC-Switch
 	url = https://github.com/sui77/rc-switch.git
+[submodule "Libraries/ESP8266 Core"]
+	path = Libraries/ESP8266 Core
+	url = https://github.com/esp8266/Arduino.git
