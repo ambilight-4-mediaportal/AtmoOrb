@@ -31,6 +31,7 @@
 // RC Switch
 #define RC_SWITCH 0
 #if RC_SWITCH == 1
+  #define RC_PIN 8
   #define RC_SLEEP_DELAY 900000 // Delay until RF transmitter send signals
   #define RC_CODE_0 10001
   #define RC_CODE_1 00010
@@ -68,8 +69,9 @@ void setup()
     leds[x] = CRGB(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE);
   }
   FastLED.show();
-  #if RC_Switch == 1
-    mySwitch.enableTransmit(8);
+  
+  #if RC_SWITCH == 1
+    mySwitch.enableTransmit(RC_PIN);
   #endif
 
   Serial.begin(115200);
