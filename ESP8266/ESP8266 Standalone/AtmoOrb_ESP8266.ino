@@ -1,6 +1,9 @@
-// AtmoOrb by Lightning303
+// AtmoOrb by Lightning303 & Rick164
 //
 // ESP8266 Standalone Version
+//
+//
+// You may change the settings that are commented
 
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
@@ -9,7 +12,7 @@
 
 #define NUM_LEDS 27 // Number of leds
 #define DATA_PIN 13 // Data pin for leds
-#define SERIAL_DEBUG 0
+#define SERIAL_DEBUG 0 // Serial debugging (0=Off, 1=On)
 
 #define ID 1 // Id of this lamp
 
@@ -19,31 +22,31 @@
 #define SMOOTH_BLOCK 0 // Block incoming colors while smoothing
 
 // Startup color
-#define STARTUP_RED 255
-#define STARTUP_GREEN 175
-#define STARTUP_BLUE 100
+#define STARTUP_RED 255 // Color shown directly after power on
+#define STARTUP_GREEN 175 // Color shown directly after power on
+#define STARTUP_BLUE 100 // Color shown directly after power on
 
 // White adjustment
-#define RED_CORRECTION 220
-#define GREEN_CORRECTION 255
-#define BLUE_CORRECTION 180
+#define RED_CORRECTION 220 // Color Correction
+#define GREEN_CORRECTION 255 // Color Correction
+#define BLUE_CORRECTION 180 // Color Correction
 
 // RC Switch
-#define RC_SWITCH 0
+#define RC_SWITCH 0 // RF transmitter to swtich remote controlled power sockets (0=Off, 1=On)
 #if RC_SWITCH == 1
-  #define RC_PIN 8
+  #define RC_PIN 8 // Data pin for RF transmitter
   #define RC_SLEEP_DELAY 900000 // Delay until RF transmitter send signals
-  #define RC_CODE_0 10001
-  #define RC_CODE_1 00010
+  #define RC_CODE_0 10001 // First part of the transmission code
+  #define RC_CODE_1 00010 // Second part of the transmission code
   RCSwitch mySwitch = RCSwitch();
   boolean remoteControlled = false;
 #endif
 
 // Network settings
-const char* ssid = "...";
-const char* password = "...";
-const IPAddress multicastIP(239, 15, 18, 2);
-const int multicastPort = 49692;
+const char* ssid = "..."; // WiFi SSID
+const char* password = "..."; // WiFi password
+const IPAddress multicastIP(239, 15, 18, 2); // Multicast IP address
+const int multicastPort = 49692; // Multicast port number
 
 CRGB leds[NUM_LEDS];
 WiFiUDP Udp;
@@ -63,18 +66,16 @@ void setup()
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
   //FastLED.setCorrection(TypicalSMD5050);
   FastLED.setCorrection(CRGB(RED_CORRECTION, GREEN_CORRECTION, BLUE_CORRECTION));
-  
-  for (byte x = 0; x < NUM_LEDS; x++)
-  {
-    leds[x] = CRGB(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE);
-  }
-  FastLED.show();
+  FastLED.showColor(CRGB(STARTUP_RED, STARTUP_GREEN, STARTUP_BLUE));
   
   #if RC_SWITCH == 1
     mySwitch.enableTransmit(RC_PIN);
   #endif
 
-  Serial.begin(115200);
+  #if SERIAL_DEBUG == 1
+    Serial.begin(115200);
+  #endif
+  
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
@@ -118,9 +119,8 @@ void loop()
       switch (rcvd[3])
       {
         case 1:
-          FastLED.clear();
-          FastLED.show();
-          clearSmoothColors();
+          setColor(0, 0, 0);
+          smoothStep = SMOOTH_STEPS;
           break;
         case 2:
         default:
@@ -128,6 +128,7 @@ void loop()
           break;
         case 4:
           setColor(rcvd[5], rcvd[6], rcvd[7]);
+          smoothStep = SMOOTH_STEPS;
           break;
         case 8:
           Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
@@ -154,15 +155,16 @@ void loop()
 // Display color on leds
 void setColor(byte red, byte green, byte blue)
 {
+  // Is the new color already active?
+  if (currentColor[0] == red && currentColor[1] == green && currentColor[2] == blue)
+  {
+    return;
+  }
   currentColor[0] = red;
   currentColor[1] = green;
   currentColor[2] = blue;
   
-  for (byte i = 0; i < NUM_LEDS; i++)
-  {
-    leds[i] = CRGB(red, green, blue);
-  }
-  FastLED.show();
+  FastLED.showColor(CRGB(red, green, blue));
 }
 
 // Set a new color to smooth to
@@ -170,8 +172,17 @@ void setSmoothColor(byte red, byte green, byte blue)
 {
   if (smoothStep == SMOOTH_STEPS || SMOOTH_BLOCK == 0)
   {
+    // Is the new color the same as the one we already are smoothing towards?
+    // If so dont do anything.
     if (nextColor[0] == red && nextColor[1] == green && nextColor[2] == blue)
     {
+      return;
+    }
+    // Is the new color the same as we have right now?
+    // If so stop smoothing and keep the current color.
+    else if (currentColor[0] == red && currentColor[1] == green && currentColor[2] == blue)
+    {
+      smoothStep = SMOOTH_STEPS;
       return;
     }
     
@@ -205,12 +216,4 @@ void smoothColor()
   byte blue = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);   
 
   setColor(red, green, blue);
-}
-
-// Clear smooth color byte arrays
-void clearSmoothColors()
-{
-  memset(prevColor, 0, sizeof(prevColor));
-  memset(currentColor, 0, sizeof(nextColor));
-  memset(nextColor, 0, sizeof(nextColor));
 }
