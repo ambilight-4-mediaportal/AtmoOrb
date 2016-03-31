@@ -16,7 +16,6 @@ unsigned long lastWiFiCheck = 0;
 
 // ORB ID
 unsigned int orbID = 1;
-bool useSmoothColor  = false;
 
 // CLOUD status
 bool cloudEnabled = true;
@@ -106,85 +105,50 @@ void loop()
         while (client.available()) {
             client.read(buffer, BUFFER_SIZE);
             unsigned int i = 0;
-            
+
             // Look for 0xC0FFEE
-            if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE)
-            {
+            if (buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE) {
                 byte commandOptions = buffer[i++];
                 byte rcvOrbID = buffer[i++];
-              
-        		// Command options
-        		// 1 = force off
-        		// 2 = use lamp smoothing and validate by Orb ID
-        		// 4 = validate by Orb ID
-                if(commandOptions == 1)
-                {
+                byte red = buffer[i++];
+                byte green = buffer[i++];
+                byte blue = buffer[i++];
+
+                // Command options
+                // 1 = force off
+                // 2 = use lamp smoothing and validate by Orb ID
+                // 4 = validate by Orb ID
+                if (commandOptions == 1) {
                     // Orb ID 0 = turn off all lights
                     // Otherwise turn off selectively
-                    if(rcvOrbID == 0)
-                    {
-                        setToBlack = true;
-                        forceLedsOFF();
+                    if (rcvOrbID == 0 || rcvOrbID == orbID) {
+                        setColor(0,0,0);
+                        smoothStep = SMOOTH_STEPS;
                     }
-                    else if(rcvOrbID == orbID)
-                    {
-                        setToBlack = true;
-                        forceLedsOFF();
-                    }
+
                     return;
                 }
-                else if(commandOptions == 2)
-                {
-                    if(rcvOrbID != orbID)
-                    {
+                else if (commandOptions == 2) {
+                    if (rcvOrbID != orbID) {
                         return;
                     }
-                    
-                    useSmoothColor = true;
-                }
-                else if(commandOptions == 4)
-                {
-                    if(rcvOrbID != orbID)
-                    {
-                        return;
-                    }
-                    
-                    useSmoothColor = false;
-                }
-    
-                byte red =  buffer[i++];
-                byte green =  buffer[i++];
-                byte blue =  buffer[i++];
-            
-                if(setToBlack && commandOptions != 1)
-                {
-                    setColor(red, green, blue);
+
                     setSmoothColor(red, green, blue);
-                    
-                    setToBlack = false;
-                    return;
                 }
-                else
-                {
-                    if(useSmoothColor)
-                    {
-                        setSmoothColor(red, green, blue);
-                    }
-                    else
-                    {
-                        setColor(red, green, blue);
+                else if (commandOptions == 4) {
+                    if (rcvOrbID != orbID) {
                         return;
                     }
+
+                    setColor(red, green, blue);
+                    smoothStep = SMOOTH_STEPS;
                 }
             }
         }
-        
-        if (useSmoothColor)
+
+        if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
         {
-            if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
-            { 
-                smoothColor();
-            }
+            smoothColor();
         }
     }
     else 
@@ -254,19 +218,4 @@ void smoothColor()
     currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
     
     setColor(currentColor[0], currentColor[1], currentColor[2]);
-}
-
-// Force all leds OFF
-void forceLedsOFF()
-{
-    setColor(0,0,0);
-    clearSmoothColors();
-}
-
-// Clear smooth color byte arrays
-void clearSmoothColors()
-{
-    memset(prevColor, 0, sizeof(prevColor));
-    memset(currentColor, 0, sizeof(nextColor));
-    memset(nextColor, 0, sizeof(nextColor));
 }
