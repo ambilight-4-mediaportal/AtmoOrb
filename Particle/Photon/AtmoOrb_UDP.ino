@@ -16,6 +16,7 @@ bool connectLock  = false;
 
 // ORB SETTINGS
 unsigned int orbID = 1;
+bool useSmoothColor  = false;
 
 // LED settings
 #define DATA_PIN    6
@@ -101,68 +102,101 @@ void loop(){
     
     int packetSize = client.parsePacket();
     
-    if(packetSize == BUFFER_SIZE) {
+    if(packetSize == BUFFER_SIZE){
         client.read(buffer, BUFFER_SIZE);
         //client.flush();
         unsigned int i = 0;
-
+        
         // Look for 0xC0FFEE
-        if (buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE) {
+        if(buffer[i++] == 0xC0 && buffer[i++] == 0xFF && buffer[i++] == 0xEE)
+        {
             byte commandOptions = buffer[i++];
             byte rcvOrbID = buffer[i++];
-            byte red = buffer[i++];
-            byte green = buffer[i++];
-            byte blue = buffer[i++];
-
+            
             // Command options
             // 1 = force off
             // 2 = use lamp smoothing and validate by Orb ID
             // 4 = validate by Orb ID
             // 8 = discovery
-            if (commandOptions == 1) {
+            if(commandOptions == 1)
+            {
                 // Orb ID 0 = turn off all lights
                 // Otherwise turn off selectively
-                if (rcvOrbID == 0 || rcvOrbID == orbID) {
-                    setColor(0,0,0);
-                    smoothStep = SMOOTH_STEPS;
+                if(rcvOrbID == 0 || rcvOrbID == orbID)
+                {
+                    setToBlack = true;
+                    forceLedsOFF();
                 }
-
+				
                 return;
             }
-            else if (commandOptions == 2) {
-                if (rcvOrbID != orbID) {
+            else if(commandOptions == 2)
+            {
+                if(rcvOrbID != orbID)
+                {
                     return;
                 }
-
-                setSmoothColor(red, green, blue);
+                
+                useSmoothColor = true;
             }
-            else if (commandOptions == 4) {
-                if (rcvOrbID != orbID) {
+            else if(commandOptions == 4)
+            {
+                if(rcvOrbID != orbID)
+                {
                     return;
                 }
-
-                setColor(red, green, blue);
-                smoothStep = SMOOTH_STEPS;
+                
+                useSmoothColor = false;
             }
-            else if (commandOptions == 8) {
+            else if(commandOptions == 8)
+            {
                 // Respond to remote IP address with Orb ID
                 IPAddress remoteIP = client.remoteIP();
                 bufferDiscovery[0] = orbID;
-
+                
                 client.sendPacket(bufferDiscovery, BUFFER_SIZE_DISCOVERY, remoteIP, DISCOVERY_PORT);
-
+                
                 // Clear buffer
                 memset(bufferDiscovery, 0, sizeof(bufferDiscovery));
                 return;
             }
+
+            byte red =  buffer[i++];
+            byte green =  buffer[i++];
+            byte blue =  buffer[i++];
+        
+            if(setToBlack && commandOptions != 1)
+            {
+                setColor(red, green, blue);
+                setSmoothColor(red, green, blue);
+                
+                setToBlack = false;
+                return;
+            }
+            else
+            {
+                if(useSmoothColor)
+                {
+                    setSmoothColor(red, green, blue);
+                }
+                else
+                {
+                    setColor(red, green, blue);
+                    return;
+                }
+            }
         }
+        
     }else if(packetSize > 0){
         // Got malformed packet
     }
-
-    if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+    
+    if (useSmoothColor)
     {
-        smoothColor();
+        if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+        { 
+            smoothColor();
+        }
     }
 }
 
@@ -210,4 +244,19 @@ void smoothColor()
     currentColor[2] = prevColor[2] + (((nextColor[2] - prevColor[2]) * smoothStep) / SMOOTH_STEPS);
     
     setColor(currentColor[0], currentColor[1], currentColor[2]);
+}
+
+// Force all leds OFF
+void forceLedsOFF()
+{
+    setColor(0,0,0);
+    clearSmoothColors();
+}
+
+// Clear smooth color byte arrays
+void clearSmoothColors()
+{
+    memset(prevColor, 0, sizeof(prevColor));
+    memset(currentColor, 0, sizeof(nextColor));
+    memset(nextColor, 0, sizeof(nextColor));
 }
