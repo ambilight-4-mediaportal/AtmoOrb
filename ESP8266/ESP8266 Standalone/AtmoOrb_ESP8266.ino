@@ -5,20 +5,25 @@
 //
 // You may change the settings that are commented
 
+#define FASTLED_ALLOW_INTERRUPTS 0
+// To make sure that all leds get changed 100% of the time, we need to allow FastLED to disabled interrupts for a short while.
+// If you experience problems, please set this value to 1.
+// This is only needed for 3 wire (1 data line + Vcc and GND) chips (e.g. WS2812B). If you are using WS2801, APA102 or similar chipsets, you can set the value back to 1.
+
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
 #include <FastLED.h>
 #include <RCSwitch.h>
 
-#define NUM_LEDS 27 // Number of leds
-#define DATA_PIN 13 // Data pin for leds
+#define NUM_LEDS 24 // Number of leds
+#define DATA_PIN 7 // Data pin for leds (the default pin 7 might correspond to pin 13 on some boards)
 #define SERIAL_DEBUG 0 // Serial debugging (0=Off, 1=On)
 
 #define ID 1 // Id of this lamp
 
 // Smoothing
-#define SMOOTH_STEPS 50 // Steps to take for smoothing colors
-#define SMOOTH_DELAY 4 // Delay between smoothing steps
+#define SMOOTH_STEPS 20 // Steps to take for smoothing colors
+#define SMOOTH_DELAY 10 // Delay between smoothing steps
 #define SMOOTH_BLOCK 0 // Block incoming colors while smoothing
 
 // Startup color
@@ -34,10 +39,10 @@
 // RC Switch
 #define RC_SWITCH 0 // RF transmitter to swtich remote controlled power sockets (0=Off, 1=On)
 #if RC_SWITCH == 1
-  #define RC_PIN 8 // Data pin for RF transmitter
+  #define RC_PIN 2 // Data pin for RF transmitter
   #define RC_SLEEP_DELAY 900000 // Delay until RF transmitter send signals
-  #define RC_CODE_0 10001 // First part of the transmission code
-  #define RC_CODE_1 00010 // Second part of the transmission code
+  char* rcCode0 = "10001"; // First part of the transmission code
+  char* rcCode1 = "00010"; // Second part of the transmission code
   RCSwitch mySwitch = RCSwitch();
   boolean remoteControlled = false;
 #endif
@@ -96,6 +101,22 @@ void setup()
 
 void loop()
 {
+  #if SERIAL_DEBUG == 1
+    if (WiFi.status() != WL_CONNECTED)
+    {
+      Serial.print(F("Lost connection to "));
+      Serial.print(ssid);
+      Serial.println(F("."));
+      Serial.println(F("Trying to reconnect."));
+      while (WiFi.status() != WL_CONNECTED)
+      {
+        delay(500);
+        Serial.print(F("."));
+      }
+      Serial.println("");
+      Serial.println(F("Reconnected."));
+    }
+  #endif
   if (Udp.parsePacket())
   {
     byte len = Udp.available();
@@ -147,7 +168,7 @@ void loop()
     {
       // Send this signal only once every seconds
       smoothMillis += 1000;
-      mySwitch.switchOff(RC_CODE_0, RC_CODE_1);
+      mySwitch.switchOff(rcCode0, rcCode1);
     }
   #endif
 }
