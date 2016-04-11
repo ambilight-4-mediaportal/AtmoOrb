@@ -40,7 +40,6 @@ byte prevColor[3];
 byte currentColor[3];
 byte smoothStep = SMOOTH_STEPS;
 unsigned long smoothMillis;
-bool setToBlack = false;
 
 // CUSTOM COLOR CORRECTIONS
 #define RED_CORRECTION 255
@@ -113,17 +112,22 @@ void loop()
                 byte commandOptions = buffer[i++];
                 byte rcvOrbID = buffer[i++];
                 
+                byte red =  buffer[i++];
+                byte green =  buffer[i++];
+                byte blue =  buffer[i++];
+                
                 // Command options
                 // 1 = force off
                 // 2 = use lamp smoothing and validate by Orb ID
                 // 4 = validate by Orb ID
+                // 8 = discovery
                 if(commandOptions == 1)
                 {
                     // Orb ID 0 = turn off all lights
                     // Otherwise turn off selectively
                     if(rcvOrbID == 0 || rcvOrbID == orbID)
                     {
-                        setToBlack = true;
+                        smoothStep = SMOOTH_STEPS;
                         forceLedsOFF();
                     }
     				
@@ -136,7 +140,7 @@ void loop()
                         return;
                     }
                     
-                    useSmoothColor = true;
+                    setSmoothColor(red, green, blue);
                 }
                 else if(commandOptions == 4)
                 {
@@ -145,32 +149,8 @@ void loop()
                         return;
                     }
                     
-                    useSmoothColor = false;
-                }
-    
-                byte red =  buffer[i++];
-                byte green =  buffer[i++];
-                byte blue =  buffer[i++];
-            
-                if(setToBlack && commandOptions != 1)
-                {
+                    smoothStep = SMOOTH_STEPS;
                     setColor(red, green, blue);
-                    setSmoothColor(red, green, blue);
-                    
-                    setToBlack = false;
-                    return;
-                }
-                else
-                {
-                    if(useSmoothColor)
-                    {
-                        setSmoothColor(red, green, blue);
-                    }
-                    else
-                    {
-                        setColor(red, green, blue);
-                        return;
-                    }
                 }
             }
     
