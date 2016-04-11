@@ -16,7 +16,6 @@ bool connectLock  = false;
 
 // ORB SETTINGS
 unsigned int orbID = 1;
-bool useSmoothColor  = true;
 
 // LED settings
 #define DATA_PIN    6
@@ -170,12 +169,9 @@ void loop(){
         // Got malformed packet
     }
     
-    if (useSmoothColor)
-    {
-        if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
-        { 
-            smoothColor();
-        }
+    if (smoothStep < SMOOTH_STEPS && millis() >= (smoothMillis + (SMOOTH_DELAY * (smoothStep + 1))))
+    { 
+        smoothColor();
     }
 }
 

@@ -16,7 +16,6 @@ unsigned long lastWiFiCheck = 0;
 
 // ORB SETTINGS
 unsigned int orbID = 1;
-bool useSmoothColor  = true;
 
 // CLOUD status
 bool cloudEnabled = true;
