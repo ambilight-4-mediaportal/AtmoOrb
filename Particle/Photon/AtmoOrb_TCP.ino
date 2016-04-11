@@ -16,7 +16,7 @@ unsigned long lastWiFiCheck = 0;
 
 // ORB SETTINGS
 unsigned int orbID = 1;
-bool useSmoothColor  = false;
+bool useSmoothColor  = true;
 
 // CLOUD status
 bool cloudEnabled = true;
@@ -62,6 +62,11 @@ void setup()
     
     // 2 - Custom color correction
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(CRGB(RED_CORRECTION, GREEN_CORRECTION, BLUE_CORRECTION));
+	
+	// Uncomment the below lines to dim the single built-in led to 5%
+    //::RGB.control(true);
+    //::RGB.brightness(5);
+    //::RGB.control(false);
 }
 
 void initWiFi()

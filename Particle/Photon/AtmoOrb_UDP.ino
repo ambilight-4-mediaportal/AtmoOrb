@@ -16,7 +16,7 @@ bool connectLock  = false;
 
 // ORB SETTINGS
 unsigned int orbID = 1;
-bool useSmoothColor  = false;
+bool useSmoothColor  = true;
 
 // LED settings
 #define DATA_PIN    6
