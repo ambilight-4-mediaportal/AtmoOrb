@@ -13,7 +13,6 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
 #include <FastLED.h>
-#include <RCSwitch.h>
 
 #define NUM_LEDS 24 // Number of leds
 #define DATA_PIN 7 // Data pin for leds (the default pin 7 might correspond to pin 13 on some boards)
@@ -39,6 +38,7 @@
 // RC Switch
 #define RC_SWITCH 0 // RF transmitter to swtich remote controlled power sockets (0=Off, 1=On)
 #if RC_SWITCH == 1
+  #include <RCSwitch.h>
   #define RC_PIN 2 // Data pin for RF transmitter
   #define RC_SLEEP_DELAY 900000 // Delay until RF transmitter send signals
   char* rcCode0 = "10001"; // First part of the transmission code
