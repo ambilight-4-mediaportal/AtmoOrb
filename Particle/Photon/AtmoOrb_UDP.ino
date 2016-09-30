@@ -61,9 +61,9 @@ void setup()
     FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(CRGB(RED_CORRECTION, GREEN_CORRECTION, BLUE_CORRECTION));
 	
 	// Uncomment the below lines to dim the single built-in led to 5%
-    ::RGB.control(true);
-    ::RGB.brightness(5);
-    ::RGB.control(false);
+    //::RGB.control(true);
+    //::RGB.brightness(5);
+    //::RGB.control(false);
 }
 
 void initWiFi()
