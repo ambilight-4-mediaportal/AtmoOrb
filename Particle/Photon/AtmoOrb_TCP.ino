@@ -91,7 +91,7 @@ void loop()
     if(millis() - lastWiFiCheck > 500)
     {
         lastWiFiCheck = millis();
-        if(!WiFi.ready() || !WiFi.connecting())
+        if(!WiFi.ready() || WiFi.connecting())
         {
             initWiFi();
         }
