@@ -17,10 +17,11 @@ features over the regular ESP8266 code.
 1. Since this controller doesn't support addressable leds it drivers the
    mosfets straight away.
 2. The controller shows it's status with the 2 status lights on-board.
+
    1. Whenever the H801 is connected to the wifi network the green led should
-         be on.
+      be on.
    2. When the H801 is connecting to the wifi the red led will flash
-         periodically (twice per second).
+      periodically (twice per second).
    3. Whenever data is received the red led will flash.
 
 To be able to flash the H801 you will need to solder the headers on the print
