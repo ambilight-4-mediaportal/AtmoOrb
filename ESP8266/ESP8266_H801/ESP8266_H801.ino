@@ -111,6 +111,7 @@ void setup()
   Serial1.begin(115200);
 #endif
 
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   wifiConnect();
 
