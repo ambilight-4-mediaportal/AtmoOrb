@@ -1,28 +1,30 @@
-SYSTEM_THREAD(ENABLED);
+//SYSTEM_THREAD(ENABLED);
 
-#include "FastLED/FastLED.h"
+#include <FastLED.h>
 FASTLED_USING_NAMESPACE;
 
 #if FASTLED_VERSION < 3001000
 #error "Requires FastLED 3.1 or later; check github for latest code."
 #endif
 
-// UDP SETTINGS
+// WiFi
+#define timeout 15000
+
+// UDP
 #define SERVER_PORT 49692
 #define DISCOVERY_PORT 49692
 UDP client;
 IPAddress multicastIP(239, 15, 18, 2);
-bool connectLock  = false;
 
-// ORB SETTINGS
+// ORB
 unsigned int orbID = 1;
 
-// LED settings
+// LED
 #define DATA_PIN    6
 #define NUM_LEDS    24
 CRGB leds[NUM_LEDS];
 
-// UDP BUFFERS
+// UDP
 #define BUFFER_SIZE  5 + 3 * NUM_LEDS
 #define BUFFER_SIZE_DISCOVERY 5
 #define TIMEOUT_MS   500
@@ -30,7 +32,7 @@ uint8_t buffer[BUFFER_SIZE];
 uint8_t bufferDiscovery[BUFFER_SIZE_DISCOVERY];
 unsigned long lastWiFiCheck = 0;
 
-// SMOOTHING SETTINGS
+// SMOOTHING
 #define SMOOTH_STEPS 50 // Steps to take for smoothing colors
 #define SMOOTH_DELAY 4 // Delay between smoothing steps
 #define SMOOTH_BLOCK 0 // Block incoming colors while smoothing
@@ -45,54 +47,52 @@ unsigned long smoothMillis;
 #define RED_CORRECTION 255
 #define GREEN_CORRECTION 255
 #define BLUE_CORRECTION 255
+#include "Particle.h"
 
 void setup()
 {
+     // Leds - choose one correction method
+     // 1 - Custom color correction
+    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(CRGB(RED_CORRECTION, GREEN_CORRECTION, BLUE_CORRECTION));
+    
+    // Set color
+    //setColor(40, 21, 0);
+    
+    // Uncomment the below lines to dim the single built-in led to 5%
+   // ::RGB.control(true);
+    //::RGB.brightness(5);
+    //::RGB.control(false);
+    
     // WiFi
     lastWiFiCheck = millis();
     initWiFi();
         
-    // Leds - choose one correction method
-    
-    // 1 - FastLED predefined color correction
+    // 2 - FastLED predefined color correction
     //FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
-    
-    // 2 - Custom color correction
-    FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(CRGB(RED_CORRECTION, GREEN_CORRECTION, BLUE_CORRECTION));
-	
-	// Uncomment the below lines to dim the single built-in led to 5%
-    //::RGB.control(true);
-    //::RGB.brightness(5);
-    //::RGB.control(false);
 }
 
 void initWiFi()
 {
-    if(!connectLock)
-    {
-        connectLock = true;
-        
-        // Wait for WiFi connection
-        waitUntil(WiFi.ready);
-        
-        //  Client
-        client.stop();
-        client.begin(SERVER_PORT);
-        //client.setBuffer(BUFFER_SIZE);
-        
-        // Multicast group
-        client.joinMulticast(multicastIP);
-        
-        connectLock = false;
-    }
+    WiFi.off();
+    WiFi.on();
+
+    // Wait for WiFi connection
+    waitFor(WiFi.ready, timeout);
+    
+    //  Client
+    client.stop();
+    client.begin(SERVER_PORT);
+    //client.setBuffer(BUFFER_SIZE);
+    
+    // Multicast group
+    client.joinMulticast(multicastIP);
 }
 
 void loop(){
-    // Check WiFi connection every minute
     if(millis() - lastWiFiCheck > 500)
     {
         lastWiFiCheck = millis();
-        if(!WiFi.ready() || WiFi.connecting())
+        if(WiFi.ready() == false)
         {
             initWiFi();
         }
