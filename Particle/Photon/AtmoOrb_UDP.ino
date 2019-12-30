@@ -1,5 +1,3 @@
-//SYSTEM_THREAD(ENABLED);
-
 #include <FastLED.h>
 FASTLED_USING_NAMESPACE;
 
@@ -8,7 +6,8 @@ FASTLED_USING_NAMESPACE;
 #endif
 
 // WiFi
-#define timeout 15000
+#define timeout 30000
+#define reconnect_delay 5000
 
 // UDP
 #define SERVER_PORT 49692
@@ -66,36 +65,33 @@ void setup()
     // WiFi
     lastWiFiCheck = millis();
     initWiFi();
-        
+
     // 2 - FastLED predefined color correction
     //FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
 }
 
 void initWiFi()
 {
-    WiFi.off();
-    WiFi.on();
-
+    // Delays added UDP client creation, required for WiFi reconnects as takes a bit for resources to be full available
+    
     // Wait for WiFi connection
+    delay(500);
     waitFor(WiFi.ready, timeout);
+    delay(reconnect_delay);
     
-    //  Client
-    client.stop();
-    client.begin(SERVER_PORT);
-    //client.setBuffer(BUFFER_SIZE);
-    
-    // Multicast group
-    client.joinMulticast(multicastIP);
+    // Multicast UDP
+    if(WiFi.ready())
+    {   
+        client.begin(SERVER_PORT);
+        delay(reconnect_delay);
+        client.joinMulticast(multicastIP);
+    }
 }
 
 void loop(){
-    if(millis() - lastWiFiCheck > 500)
-    {
-        lastWiFiCheck = millis();
-        if(WiFi.ready() == false)
-        {
-            initWiFi();
-        }
+    
+    if(WiFi.ready() == false)    {
+        initWiFi();
     }
     
     int packetSize = client.parsePacket();
